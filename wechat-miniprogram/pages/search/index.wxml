@@ -1,0 +1,15 @@
+<view class="searchbar">
+  <input value="{{keyword}}" bindinput="onKeyword" bindconfirm="submit" confirm-type="search" placeholder="搜角色、Coser或场景" aria-label="搜索关键词" />
+  <button bindtap="submit">搜索</button>
+</view>
+<scroll-view class="filters" scroll-x enhanced show-scrollbar="false">
+  <button wx:for="{{filters}}" wx:key="key" class="filter {{item.value ? 'filter--active' : ''}} {{item.key === 'gender' ? 'filter--locked' : ''}} {{filterSheetOpen && filterSheetKey === item.key ? 'filter--open' : ''}}" data-key="{{item.key}}" bindtap="chooseFilter" aria-expanded="{{filterSheetOpen && filterSheetKey === item.key}}"><text class="filter__label">{{item.value || item.label}}</text><text wx:if="{{item.key === 'gender'}}" class="filter__fixed">固定</text><view wx:else class="control-chevron control-chevron--down filter__chevron" aria-hidden="true"></view></button>
+</scroll-view>
+<view wx:if="{{filterSheetOpen}}" class="filter-overlay" bindtap="closeFilterSheet"><view class="filter-sheet" catchtap="stopTap"><view class="filter-sheet__handle"></view><view class="filter-sheet__head"><text>{{filterSheetTitle}}</text><button bindtap="closeFilterSheet" aria-label="关闭筛选">×</button></view><scroll-view scroll-y class="filter-sheet__list"><button wx:for="{{filterSheetOptions}}" wx:key="*this" class="filter-option {{filterSheetSelected === item ? 'filter-option--selected' : ''}}" data-value="{{item}}" bindtap="selectFilterOption" aria-selected="{{filterSheetSelected === item}}"><text>{{item}}</text><view class="filter-option__mark" aria-hidden="true"></view></button></scroll-view></view></view>
+<view class="page results-page">
+  <view class="summary"><text class="summary__copy">{{city}}找到 {{results.length}} 位可预约 Coser · 已优先展示实名认证与高履约率</text><button bindtap="clearFilters">重置</button></view>
+  <view wx:if="{{results.length}}" class="grid">
+    <service-card wx:for="{{results}}" wx:key="id" item="{{item}}" bind:open="openService" />
+  </view>
+  <view wx:else class="empty"><text>暂时没有符合条件的Coser</text><button class="btn btn--primary" bindtap="clearFilters">清空筛选</button></view>
+</view>

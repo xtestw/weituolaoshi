@@ -1,0 +1,93 @@
+<view class="editor-shell">
+  <view class="editor-nav" style="padding-top: {{navTop}}px">
+    <button class="editor-nav__close" bindtap="closeEditor" aria-label="关闭发帖">×</button>
+    <text class="editor-nav__title">发帖</text>
+    <button class="editor-nav__publish {{saving ? 'editor-nav__publish--disabled' : ''}}" bindtap="publish" loading="{{saving}}" disabled="{{saving}}">发布</button>
+  </view>
+
+  <view class="composer-page">
+    <view class="compose-card">
+      <view class="media-head">
+        <text class="media-head__title">照片</text>
+        <text class="media-head__hint">{{images.length}}/9 · 点击图片设为封面</text>
+      </view>
+      <view class="media-grid">
+        <view wx:for="{{images}}" wx:key="id" class="photo {{item.cover ? 'photo--cover' : ''}}" data-index="{{index}}" bindtap="setCover">
+          <image class="photo__image" src="{{item.path}}" mode="aspectFill" />
+          <text wx:if="{{item.cover}}" class="photo__cover">封面</text>
+          <button class="photo__delete" data-index="{{index}}" catchtap="removeImage" aria-label="删除第{{index + 1}}张图片">×</button>
+        </view>
+        <button wx:if="{{images.length < 9}}" class="media-add" bindtap="addImage" aria-label="添加照片">
+          <view class="media-add__icon" aria-hidden="true"></view>
+          <text class="media-add__title">添加照片</text>
+          <text class="media-add__hint">首图更吸引人</text>
+        </button>
+      </view>
+
+      <input class="compose-title" data-field="title" value="{{title}}" bindinput="onField" maxlength="30" placeholder="填写角色和服务标题" aria-label="帖子标题" />
+      <textarea class="compose-desc" data-field="description" value="{{description}}" bindinput="onField" maxlength="1000" placeholder="介绍角色、委托内容、互动方式和适合的场景…" aria-label="帖子正文" />
+      <text class="compose-count">{{description.length}}/1000</text>
+    </view>
+
+    <view class="settings-card">
+      <view class="price-row">
+        <view class="price-field">
+          <text class="price-field__label">价格</text>
+          <view class="price-field__input"><text class="price-field__currency">¥</text><input class="price-field__control" data-field="price" value="{{price}}" bindinput="onField" type="digit" placeholder="0" aria-label="每小时价格" /><text class="price-field__unit">元/小时</text></view>
+        </view>
+        <view class="price-field price-field--hours">
+          <text class="price-field__label">起约</text>
+          <picker range="{{minHourOptions}}" bindchange="onMinHours"><view class="price-field__picker"><text>{{minHours}}小时</text><view class="control-chevron control-chevron--down" aria-hidden="true"></view></view></picker>
+        </view>
+      </view>
+
+      <button class="setting-row" bindtap="choosePlace">
+        <view class="setting-row__copy"><text class="setting-row__title">服务地点</text><text class="setting-row__value">{{city}} · {{place}}</text></view><view class="control-chevron" aria-hidden="true"></view>
+      </button>
+      <button class="setting-row" bindtap="openBoundaryEditor">
+        <view class="setting-row__copy"><text class="setting-row__title">相处偏好与边界</text><text class="setting-row__value">{{boundarySummary}}</text></view><view class="control-chevron" aria-hidden="true"></view>
+      </button>
+      <button class="setting-row" bindtap="editQuestions">
+        <view class="setting-row__copy"><text class="setting-row__title">委托前确认</text><text class="setting-row__value">已设置 {{questionCount}} 个问题</text></view><view class="control-chevron" aria-hidden="true"></view>
+      </button>
+      <button class="setting-row" bindtap="openSchedule">
+        <view class="setting-row__copy"><text class="setting-row__title">可约档期</text><text class="setting-row__value">沿用主页档期，可单独调整</text></view><view class="control-chevron" aria-hidden="true"></view>
+      </button>
+    </view>
+
+    <text class="compose-tip">发布后可以继续编辑；帖子进入委托流程后，内容、价格和删除操作将暂时锁定。</text>
+    <button class="draft-button" bindtap="saveDraft" disabled="{{saving}}">保存草稿</button>
+  </view>
+
+  <view wx:if="{{boundarySheetOpen}}" class="sheet-mask" bindtap="closeBoundaryEditor">
+    <view class="boundary-sheet" catchtap="stopTap">
+      <view class="sheet-handle"></view>
+      <view class="sheet-head"><view><text class="sheet-head__title">相处偏好与边界</text><text class="sheet-head__hint">用户将在详情页和下单页看到</text></view><button class="sheet-head__close" bindtap="closeBoundaryEditor" aria-label="关闭边界编辑">×</button></view>
+      <view class="boundary-list">
+        <view wx:for="{{boundaries}}" wx:key="id" class="boundary-item">
+          <text class="boundary-item__index">{{index + 1}}</text>
+          <input class="boundary-item__input" value="{{item.text}}" data-index="{{index}}" bindinput="editBoundary" maxlength="30" placeholder="填写一条明确边界" aria-label="第{{index + 1}}条边界" />
+          <button class="boundary-item__delete" data-index="{{index}}" bindtap="removeBoundary" aria-label="删除第{{index + 1}}条边界">删除</button>
+        </view>
+      </view>
+      <button class="boundary-add" bindtap="addBoundary">＋ 添加一条</button>
+      <button class="boundary-confirm" bindtap="confirmBoundaries">完成</button>
+    </view>
+  </view>
+
+  <view wx:if="{{questionSheetOpen}}" class="sheet-mask" bindtap="closeQuestionEditor">
+    <view class="boundary-sheet" catchtap="stopTap">
+      <view class="sheet-handle"></view>
+      <view class="sheet-head"><view><text class="sheet-head__title">委托前确认</text><text class="sheet-head__hint">用户下单时会看到这些问题</text></view><button class="sheet-head__close" bindtap="closeQuestionEditor" aria-label="关闭问题编辑">×</button></view>
+      <view class="boundary-list">
+        <view wx:for="{{questions}}" wx:key="id" class="boundary-item">
+          <text class="boundary-item__index">{{index + 1}}</text>
+          <input class="boundary-item__input" value="{{item.text}}" data-index="{{index}}" bindinput="editQuestion" maxlength="60" placeholder="填写委托前需要确认的问题" aria-label="第{{index + 1}}个问题" />
+          <button class="boundary-item__delete" data-index="{{index}}" bindtap="removeQuestion" aria-label="删除第{{index + 1}}个问题">删除</button>
+        </view>
+      </view>
+      <button class="boundary-add" bindtap="addQuestion">＋ 添加问题</button>
+      <button class="boundary-confirm" bindtap="confirmQuestions">完成</button>
+    </view>
+  </view>
+</view>

@@ -1,0 +1,26 @@
+.status-hero { padding: 44rpx 34rpx; background: linear-gradient(135deg,#e5e7ff,#f6d8e7); }
+.status-hero text { display: block; }
+.status-hero__title { font-size: var(--type-page); line-height: 1.25; font-weight: var(--weight-page); }
+.status-hero text:last-child { margin-top: 8rpx; color: var(--color-muted); font-size: 24rpx; }
+.status-hero--completed { background: var(--color-success-soft); }
+.status-hero--cancel_pending { background: var(--color-danger-soft); }
+.detail-page { padding-top: 4rpx; }
+.service { display: flex; gap: 20rpx; align-items: center; }
+.cover { width: 132rpx; height: 132rpx; flex: none; padding: 14rpx; box-sizing: border-box; display: flex; align-items: flex-end; border-radius: 20rpx; background: linear-gradient(145deg,#dfe5ff,#f2bad2); color: rgba(36,29,45,.6); font-weight: 800; }
+.service>view:last-child { flex: 1; min-width: 0; }
+.service text { display: block; }
+.service .price { margin-top: 8rpx; }
+.line__value { max-width: 66%; overflow-wrap: anywhere; }
+.step { position: relative; min-height: 92rpx; padding-left: 50rpx; display: grid; grid-template-columns: minmax(0,1fr) auto; align-items: start; gap: 12rpx; font-size: 26rpx; }
+.step::before { content: ''; position: absolute; left: 14rpx; top: 30rpx; bottom: -30rpx; width: 2rpx; background: #ddd8e2; }
+.step:last-child::before { display: none; }
+.step>view { position: absolute; left: 0; top: 8rpx; width: 28rpx; height: 28rpx; border: 5rpx solid #c4bdca; border-radius: 50%; background: #fff; }
+.step>text:last-child { color: var(--color-muted); font-size: 23rpx; }
+.step--done>view { border-color: var(--color-primary); background: var(--color-primary); box-shadow: inset 0 0 0 6rpx #fff; }
+.cancel { margin-top: 24rpx; }
+.identity-card { border-color: #cfd4ff; background: linear-gradient(145deg,#fff,#f3f4ff); }
+.identity-card--passed { border-color: #bfe6d6; background: linear-gradient(145deg,#fff,#eef9f4); }
+.identity-action { margin-top: 22rpx; }
+.identity-result { margin-top: 20rpx; padding: 18rpx; display: flex; align-items: center; gap: 14rpx; border-radius: 18rpx; background: var(--color-success-soft); color: var(--color-success); font-size: 25rpx; font-weight: 700; }
+.identity-result view { width: 40rpx; height: 40rpx; border-radius: 50%; background: var(--color-success); color: #fff; line-height: 40rpx; text-align: center; }
+.safety-card { margin-bottom: 20rpx; }

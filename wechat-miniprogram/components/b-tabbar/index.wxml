@@ -1,0 +1,1 @@
+<view class="b-tabbar" role="tablist"><button wx:for="{{tabs}}" wx:key="key" class="b-tab {{selected === item.key ? 'b-tab--active' : ''}}" data-key="{{item.key}}" bindtap="navigate" aria-label="{{item.label}}" aria-selected="{{selected === item.key}}"><view class="b-tab__mark b-tab__mark--{{item.key}}" aria-hidden="true"></view><text>{{item.label}}</text></button></view>

@@ -1,0 +1,20 @@
+.calendar-page { padding-top: 4rpx; padding-bottom: 60rpx; }
+.section__head button.section__link { min-height: 72rpx; margin: 0; padding: 0 18rpx; display: flex; align-items: center; justify-content: center; gap: 12rpx; border: 2rpx solid #cbd0ff; border-radius: 18rpx; background: var(--color-primary-soft); color: var(--color-primary-ink); font-size: 24rpx; font-weight: 700; }
+.batch-toggle .control-chevron { width: 12rpx; height: 12rpx; }
+.month-nav { display: flex; align-items: center; justify-content: space-between; margin: 8rpx 0 16rpx; font-size: 30rpx; font-weight: 750; }
+.month-nav button { width: 88rpx; height: 88rpx; margin: 0; padding: 0; border: 0; border-radius: 50%; background: var(--color-primary-soft); color: var(--color-primary); font-size: 42rpx; }
+.month-nav__disabled { background: #f5f4f8; color: #bdb7c4; }
+.week-head,.month-grid { display: grid; grid-template-columns: repeat(7,minmax(0,1fr)); gap: 6rpx; }
+.week-head text { text-align: center; color: var(--color-muted); font-size: 22rpx; }
+.month-grid { margin-top: 10rpx; }
+.day-cell { min-width: 0; min-height: 88rpx; }
+.day { width: 100%; min-height: 88rpx; margin: 0; padding: 5rpx 0; display: flex; flex-direction: column; align-items: center; justify-content: center; border: 2rpx solid transparent; border-radius: 14rpx; background: var(--color-bg); color: var(--color-muted); font-size: 22rpx; line-height: 1.2; }
+.day text:first-child { color: var(--color-text); font-size: 28rpx; font-weight: 750; }
+.day--open { background: var(--color-success-soft); color: var(--color-success); }
+.day--selected { border-color: var(--color-primary); }
+.calendar-hint,.batch__hint { display: block; margin-top: 20rpx; color: var(--color-muted); font-size: 23rpx; }
+.batch { padding-top: 18rpx; padding-bottom: 18rpx; }
+.batch button { width: 100%; min-height: 84rpx; margin: 0; padding: 0 4rpx; display: flex; align-items: center; justify-content: space-between; border: 0; border-bottom: 1rpx solid var(--color-border); background: transparent; color: var(--color-text); text-align: left; font-size: 26rpx; }
+.batch button text { color: var(--color-muted-soft); }
+.batch__applied { color: var(--color-primary-ink); font-weight: 750; }
+.batch__applied text { color: var(--color-success); }

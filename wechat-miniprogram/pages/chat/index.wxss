@@ -1,0 +1,19 @@
+.chat-page { height: 100vh; box-sizing: border-box; display: flex; flex-direction: column; background: #f4f2f7; }
+.safety { padding: 16rpx 28rpx; background: #fff8dd; color: #6b5720; font-size: 23rpx; text-align: center; }
+.chat-list { flex: 1; min-height: 0; padding: 24rpx; box-sizing: border-box; }
+.bubble-row { margin: 16rpx 0; display: flex; }
+.bubble-row--me { justify-content: flex-end; }
+.bubble-row--system { justify-content: center; }
+.bubble { max-width: 72%; box-sizing: border-box; padding: 18rpx 22rpx; overflow-wrap: anywhere; border-radius: 24rpx 24rpx 24rpx 6rpx; background: #fff; color: var(--color-text); font-size: 27rpx; }
+.bubble-row--me .bubble { border-radius: 24rpx 24rpx 6rpx 24rpx; background: var(--color-primary); color: #fff; }
+.bubble-row--system .bubble { padding: 10rpx 18rpx; border-radius: 999rpx; background: #e8e5ec; color: var(--color-muted); font-size: 22rpx; }
+.confirm-card { padding: 18rpx 24rpx; display: flex; align-items: center; justify-content: space-between; gap: 20rpx; border-top: 1rpx solid var(--color-border); background: #fff; }
+.confirm-card>view { flex: 1; min-width: 0; }
+.confirm-card text { display: block; }
+.confirm-card text:first-child { font-weight: 700; }
+.confirm-card text:last-child { color: var(--color-muted); font-size: 22rpx; }
+.confirm-card button { min-width: 156rpx; min-height: 88rpx; margin: 0; padding: 0 20rpx; border: 0; border-radius: 999rpx; background: var(--color-primary-soft); color: var(--color-primary); font-size: 24rpx; font-weight: 700; }
+.confirm-card button[disabled] { background: var(--color-success-soft); color: var(--color-success); }
+.composer { padding: 16rpx 24rpx calc(16rpx + env(safe-area-inset-bottom)); display: flex; gap: 12rpx; border-top: 1rpx solid var(--color-border); background: #fff; }
+.composer input { flex: 1; min-width: 0; height: 88rpx; box-sizing: border-box; padding: 0 22rpx; border-radius: 24rpx; background: var(--color-soft); font-size: 26rpx; }
+.composer button { width: 112rpx; height: 88rpx; margin: 0; padding: 0; display: flex; align-items: center; justify-content: center; border: 0; border-radius: 999rpx; background: var(--color-primary); color: #fff; font-size: 25rpx; line-height: 1; }

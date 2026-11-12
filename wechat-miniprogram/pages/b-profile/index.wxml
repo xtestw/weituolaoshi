@@ -1,0 +1,10 @@
+<view class="page b-profile-page">
+  <view class="person"><view class="avatar">梨</view><view><text class="name">阿梨 <text class="tag tag--success">已认证</text></text><text class="muted">女 · 完成68单 · 评分4.9 · 近90天低取消</text></view></view>
+  <view class="section settlement">
+    <view class="section__head"><text class="section__title">收款与结算</text><text class="tag tag--success">微信收款</text></view>
+    <text class="settlement__note">双方确认履约完成、订单无争议后，平台按规则结算至微信。</text>
+    <view class="settlement-grid"><view><text>¥1,742</text><text>待结算</text></view><view><text>¥5,920</text><text>本月已结算</text></view><view><text>4</text><text>本月订单</text></view></view>
+  </view>
+  <view class="section"><view class="section__head"><text class="section__title">保证金与平台费</text></view><view class="line"><text>平台保证金</text><text class="line__value">¥500 · 正常</text></view><view class="line"><text>B端技术服务费</text><text class="line__value">成交金额10%</text></view><view class="line"><text>结算规则</text><text class="line__value">完成后48小时无争议</text></view></view>
+  <view class="section menu"><button bindtap="openPublish"><text>主页与帖子管理</text><text>›</text></button><button bindtap="openIncome"><text>收入与结算明细</text><text>›</text></button><button bindtap="openDeposit"><text>保证金</text><text>已缴纳 ¥500 ›</text></button><button bindtap="openSafety"><text>履约安全与规则</text><text>›</text></button><button bindtap="openSupport"><text>申诉与客服</text><text>›</text></button></view>
+</view><b-tabbar selected="profile" />

@@ -1,0 +1,4 @@
+.safety-page { padding-top: 4rpx; }
+.verify-button { width: fit-content; margin: 20rpx 0 0; color: var(--color-primary); }
+.relation-button { width: 100%; min-height: 88rpx; margin: 14rpx 0 0; padding: 0 24rpx; display: flex; align-items: center; justify-content: space-between; gap: 16rpx; border: 2rpx solid var(--color-border); border-radius: 20rpx; background: var(--color-bg); color: var(--color-text); text-align: left; font-weight: 650; }
+.save-button { width: 100%; margin: 30rpx 0 0; }

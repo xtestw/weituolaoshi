@@ -1,0 +1,9 @@
+<scroll-view class="order-tabs" scroll-x show-scrollbar="false"><button wx:for="{{tabs}}" wx:key="key" class="{{tab === item.key ? 'active' : ''}}" data-key="{{item.key}}" bindtap="select">{{item.label}}</button></scroll-view>
+<view class="page orders-page">
+  <button wx:for="{{visibleOrders}}" wx:key="id" class="order-card" data-id="{{item.id}}" bindtap="open">
+    <view class="order-card__head"><text>{{item.title}}</text><text>{{item.statusText}}</text></view>
+    <view class="order-card__body"><view class="order-cover">MAR</view><view><text>{{item.coser}} · {{item.date}}</text><text>{{item.place}}</text><text class="price">实付 ¥{{item.amount}}</text></view></view>
+    <view class="order-card__foot"><text>订单号 {{item.id}}</text><text>查看详情 ›</text></view>
+  </button>
+  <view wx:if="{{!visibleOrders.length}}" class="empty"><text>当前状态下还没有委托</text></view>
+</view>

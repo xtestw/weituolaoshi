@@ -1,0 +1,6 @@
+<view class="page messages-page">
+  <button wx:for="{{messages}}" wx:key="id" class="message-item" data-index="{{index}}" bindtap="open">
+    <view class="avatar avatar--{{item.type}}"><text>{{item.avatar}}</text></view>
+    <view class="message-copy"><view class="message-copy__head"><text class="message-copy__name">{{item.name}}</text><text class="message-copy__time">{{item.time}}</text></view><view class="message-copy__body"><text class="message-copy__preview">{{item.preview}}</text><text wx:if="{{item.unread}}" class="unread">{{item.unread}}</text></view></view>
+  </button>
+</view>

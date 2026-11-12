@@ -1,0 +1,55 @@
+<view class="safe-top home-head">
+  <view class="brand-row"><text class="brand-name">次元委托</text></view>
+  <view class="utility-row">
+    <button class="location {{cityPickerOpen ? 'location--open' : ''}}" bindtap="selectCity" aria-label="切换城市，当前{{city}}" aria-expanded="{{cityPickerOpen}}"><text>{{city}}</text><view class="control-chevron control-chevron--down" aria-hidden="true"></view></button>
+    <view class="search">
+      <view class="search__icon" aria-hidden="true"></view>
+      <input class="search__input" value="{{keyword}}" bindinput="onKeyword" bindconfirm="submitSearch" confirm-type="search" placeholder="搜索角色、Coser或场景" aria-label="搜索" />
+      <button class="search__submit" bindtap="submitSearch" aria-label="提交搜索">搜索</button>
+    </view>
+  </view>
+</view>
+
+<view wx:if="{{cityPickerOpen}}" class="city-overlay" bindtap="closeCityPicker">
+  <view class="city-sheet" catchtap="stopCalendar">
+    <view class="city-sheet__head"><text>选择开放城市</text><button class="city-sheet__close" bindtap="closeCityPicker" aria-label="关闭城市选择">×</button></view>
+    <view class="city-sheet__grid"><button wx:for="{{cities}}" wx:key="*this" class="city-sheet__option {{city === item ? 'city-sheet__active' : ''}}" data-city="{{item}}" bindtap="chooseCity">{{item}}</button></view>
+  </view>
+</view>
+
+<view wx:if="{{calendarOpen}}" class="calendar-overlay" bindtap="closeCalendar">
+  <view class="calendar-sheet" catchtap="stopCalendar">
+    <view class="calendar-sheet__handle"></view>
+    <view class="calendar-sheet__head">
+      <view>
+        <text class="calendar-sheet__title">选择可约日期</text>
+        <text class="calendar-sheet__hint">选择一个日期区间</text>
+      </view>
+      <button class="calendar-sheet__close" bindtap="closeCalendar" aria-label="关闭日历">×</button>
+    </view>
+    <view class="calendar-sheet__month">2026年11月</view>
+    <view class="calendar-week"><text class="calendar-week__day" wx:for="{{calendarWeekdays}}" wx:key="*this">{{item}}</text></view>
+    <view class="calendar-grid">
+      <view wx:for="{{calendarDays}}" wx:key="key" class="calendar-cell {{item.blank ? 'calendar-cell--blank' : ''}} {{!item.blank && item.day >= calendarStart && item.day <= (calendarEnd || calendarStart) ? 'calendar-cell--range' : ''}} {{item.day === calendarStart || item.day === calendarEnd ? 'calendar-cell--edge' : ''}}">
+        <button class="calendar-cell__button" wx:if="{{!item.blank}}" data-day="{{item.day}}" bindtap="chooseCalendarDay" aria-label="11月{{item.day}}日">{{item.day}}</button>
+      </view>
+    </view>
+    <view class="calendar-summary">
+      <text>开始</text><text class="calendar-summary__value">11.{{calendarStart < 10 ? '0' + calendarStart : calendarStart}}</text>
+      <view class="calendar-summary__line"></view>
+      <text>结束</text><text class="calendar-summary__value">{{calendarEnd ? '11.' + (calendarEnd < 10 ? '0' + calendarEnd : calendarEnd) : '请选择'}}</text>
+    </view>
+    <button class="calendar-confirm" bindtap="confirmCalendar">确认日期</button>
+  </view>
+</view>
+
+<view class="page home-page">
+  <scroll-view class="feed-tabs" scroll-x enhanced show-scrollbar="false">
+    <button wx:for="{{feeds}}" wx:key="key" class="feed-tab {{activeFeed === item.key ? 'feed-tab--active' : ''}} {{item.key === 'calendar' && calendarOpen ? 'feed-tab--open' : ''}}" data-key="{{item.key}}" bindtap="selectFeed" aria-selected="{{activeFeed === item.key}}">{{item.label}}</button>
+  </scroll-view>
+  <view class="waterfall">
+    <view class="column"><service-card wx:for="{{left}}" wx:key="id" item="{{item}}" bind:open="openService" /></view>
+    <view class="column column--offset"><service-card wx:for="{{right}}" wx:key="id" item="{{item}}" bind:open="openService" /></view>
+  </view>
+  <view wx:if="{{!left.length && !right.length}}" class="empty">{{city}}暂无上架委托，换个开放城市看看</view>
+</view>

@@ -1,0 +1,14 @@
+<button class="card" bindtap="open" aria-label="查看{{item.title}}，{{item.price}}元每小时">
+  <view class="cover cover--{{item.tone}}">
+    <view class="cover__orb"></view>
+    <view class="cover__portrait"><view class="cover__head"></view><view class="cover__hair"></view><view class="cover__body"></view></view>
+    <view class="cover__spark cover__spark--one"></view><view class="cover__spark cover__spark--two"></view>
+    <text class="cover__creator">{{item.coser}}的角色委托</text>
+    <text wx:if="{{item.available}}" class="cover__status">可约</text>
+  </view>
+  <view class="copy">
+    <text class="title">{{item.title}}</text>
+    <view class="meta"><text class="meta__location">{{item.coser}} · {{item.district}}</text><text class="rating">★ {{item.rating}}</text></view>
+    <view class="foot"><text class="price">¥{{item.price}}<text class="price__unit">/小时</text></text><text class="verified"><text class="verified__check">✓</text> 真人认证</text></view>
+  </view>
+</button>

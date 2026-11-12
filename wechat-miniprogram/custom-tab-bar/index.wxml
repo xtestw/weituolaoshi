@@ -1,0 +1,16 @@
+<view wx:if="{{!hidden}}" class="tabbar" role="tablist">
+  <button
+    wx:for="{{tabs}}"
+    wx:key="pagePath"
+    class="tab {{selected === index ? 'tab--active' : ''}} {{item.type === 'plus' ? 'tab--publish' : ''}}"
+    data-path="{{item.pagePath}}"
+    bindtap="switchTab"
+    aria-label="{{item.text}}"
+    aria-selected="{{selected === index}}"
+  >
+    <image wx:if="{{selected === index}}" class="tab__icon-image" src="/assets/tab-icons/{{item.type}}.png" mode="aspectFit" aria-hidden="true" />
+    <image wx:else class="tab__icon-image" src="/assets/tab-icons/{{item.type}}-outline.png" mode="aspectFit" aria-hidden="true" />
+    <view wx:if="{{item.type === 'message'}}" class="tab__dot" aria-hidden="true"></view>
+    <text>{{item.text}}</text>
+  </button>
+</view>

@@ -1,0 +1,11 @@
+<view class="page verify-page">
+  <view class="verify-hero"><view class="shield"><view></view></view><text class="verify-hero__title">{{mode === 'coser' ? '完成真人认证' : '确认是你本人'}}</text><text class="muted">{{mode === 'coser' ? '发布前需核验本人身份与成年状态，提交后由平台审核并通过消息通知。' : '用于成年与同性下单校验，其他用户不会看到任何证件信息。'}}</text></view>
+  <view class="section">
+    <label class="field-label">真实姓名</label><input class="field" data-field="name" value="{{name}}" bindinput="onField" placeholder="与身份证保持一致" /><text wx:if="{{errors.name}}" class="field-error">{{errors.name}}</text>
+    <label class="field-label">身份证号码</label><input class="field" data-field="idNumber" value="{{idNumber}}" bindinput="onField" type="idcard" maxlength="18" placeholder="仅用于平台安全核验" /><text wx:if="{{errors.idNumber}}" class="field-error">{{errors.idNumber}}</text>
+    <checkbox-group bindchange="onAgree"><label class="agreement"><checkbox value="agree" color="#5b67f1" /><text>我已阅读并同意《身份信息处理规则》和《用户协议》</text></label></checkbox-group>
+    <text wx:if="{{errors.agreed}}" class="field-error">{{errors.agreed}}</text>
+  </view>
+  <view class="notice"><text>平台只在服务端完成核验。正式上线时，此页面会调用合规实名认证服务，前端不会保存完整身份证号。</text></view>
+  <button class="btn btn--primary submit" bindtap="submit" loading="{{submitting}}" disabled="{{submitting}}">{{submitting ? '正在核验' : '同意授权并完成认证'}}</button>
+</view>

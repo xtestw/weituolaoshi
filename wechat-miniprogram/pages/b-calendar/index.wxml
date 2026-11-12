@@ -1,0 +1,10 @@
+<view class="page calendar-page">
+  <view class="section">
+    <view class="section__head"><text class="section__title">档期设置</text><button class="section__link batch-toggle" bindtap="toggleBatch" aria-expanded="{{batchOpen}}"><text>{{batchOpen ? '收起批量设置' : '批量设置'}}</text><view class="control-chevron {{batchOpen ? 'control-chevron--up' : 'control-chevron--down'}} control-chevron--active" aria-hidden="true"></view></button></view>
+    <view class="month-nav"><button class="{{!canPrev ? 'month-nav__disabled' : ''}}" data-delta="-1" bindtap="changeMonth" disabled="{{!canPrev}}" aria-label="上个月">‹</button><text>{{year}}年{{month}}月</text><button class="{{!canNext ? 'month-nav__disabled' : ''}}" data-delta="1" bindtap="changeMonth" disabled="{{!canNext}}" aria-label="下个月">›</button></view>
+    <view class="week-head"><text>一</text><text>二</text><text>三</text><text>四</text><text>五</text><text>六</text><text>日</text></view>
+    <view class="month-grid"><view wx:for="{{days}}" wx:key="key" class="day-cell"><button wx:if="{{!item.blank}}" class="day {{item.open ? 'day--open' : 'day--closed'}} {{selectedKey === item.key ? 'day--selected' : ''}}" data-key="{{item.key}}" bindtap="toggleDay" aria-label="{{month}}月{{item.day}}日，{{item.label}}" aria-pressed="{{item.open}}"><text>{{item.day}}</text><text>{{item.label}}</text></button></view></view>
+    <text class="calendar-hint">默认不可约。点击日期即可切换状态，设置范围至 2027年12月。</text>
+  </view>
+  <view wx:if="{{batchOpen}}" class="section batch"><view class="section__head"><text class="section__title">批量设置 · {{year}}年{{month}}月</text></view><button wx:for="{{batchOptions}}" wx:key="*this" class="{{lastBatchIndex === index ? 'batch__applied' : ''}}" data-index="{{index}}" bindtap="applyBatch">{{item}}<text>{{lastBatchIndex === index ? '已应用' : '›'}}</text></button><text class="batch__hint">批量设置作用于当前月份。</text></view>
+</view>

@@ -1,0 +1,9 @@
+<view class="chat-page">
+  <view class="safety">请勿在站外支付；涉及临时改期、边界调整请在订单内留痕。</view>
+  <scroll-view class="chat-list" scroll-y scroll-into-view="bottom">
+    <view wx:for="{{messages}}" wx:key="id" class="bubble-row bubble-row--{{item.from}}"><view class="bubble">{{item.text}}</view></view>
+    <view id="bottom"></view>
+  </scroll-view>
+  <view class="confirm-card"><view><text>订单时间确认</text><text>{{confirmed ? '双方已确认，可继续下单' : '24小时内下单必须先确认'}}</text></view><button bindtap="confirmTime" disabled="{{confirmed}}">{{confirmed ? '已确认' : '确认时间'}}</button></view>
+  <view class="composer"><input value="{{text}}" bindinput="onText" bindconfirm="send" confirm-type="send" placeholder="仅用于订单咨询与履约沟通" /><button bindtap="send">发送</button></view>
+</view>

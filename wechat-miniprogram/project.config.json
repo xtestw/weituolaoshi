@@ -1,0 +1,21 @@
+{
+  "description": "Coser线下委托撮合平台V1",
+  "packOptions": {
+    "ignore": [
+      { "type": "folder", "value": "docs" }
+    ]
+  },
+  "setting": {
+    "useCompilerPlugins": false,
+    "es6": true,
+    "enhance": true,
+    "postcss": true,
+    "minified": true,
+    "urlCheck": false
+  },
+  "compileType": "miniprogram",
+  "appid": "wx2a40389a906e9916",
+  "projectname": "coser-marketplace-v1",
+  "miniprogramRoot": "./",
+  "condition": {}
+}

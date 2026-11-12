@@ -1,0 +1,8 @@
+.tabbar { --color-border: #e7e2ec; --color-muted: #625b6b; --color-primary-ink: #3943a9; --color-primary-soft: #eff0ff; --color-cta: #cf367a; --color-cta-ink: #b53170; --color-cta-soft: #fff0f7; position: fixed; z-index: 80; left: 0; right: 0; bottom: 0; height: calc(124rpx + env(safe-area-inset-bottom)); box-sizing: border-box; padding: 10rpx 20rpx calc(10rpx + env(safe-area-inset-bottom)); display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); align-items: center; gap: 8rpx; border-top: 1rpx solid var(--color-border); background: #fff; box-shadow: 0 -8rpx 26rpx rgba(55,42,77,.06); }
+.tab { position: relative; width: 100%; min-width: 0; height: 104rpx; min-height: 104rpx; margin: 0; padding: 10rpx 0 8rpx; border: 0; border-radius: 24rpx; background: transparent; color: var(--color-muted); font-size: 22rpx; line-height: 1.2; font-weight: 550; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 7rpx; transition: background-color .16s ease, color .16s ease, opacity .16s ease; }
+.tab:active { opacity: .72; }
+.tab--active { background: var(--color-primary-soft); color: var(--color-primary-ink); font-weight: 750; }
+.tab--publish { color: var(--color-muted); }
+.tab--publish.tab--active { background: var(--color-cta-soft); color: var(--color-cta-ink); }
+.tab__icon-image { width: 58rpx; height: 58rpx; margin: -4rpx 0 -6rpx; flex: none; }
+.tab__dot { position: absolute; top: 7rpx; left: calc(50% + 18rpx); width: 12rpx; height: 12rpx; box-sizing: border-box; border: 2rpx solid #fff; border-radius: 50%; background: var(--color-cta); }

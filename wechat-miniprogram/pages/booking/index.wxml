@@ -1,0 +1,53 @@
+<view class="page page--no-tab">
+  <view class="section service-summary"><view class="summary-cover"><text>{{service.mark}}</text></view><view><text class="section__title">{{service.title}}</text><text class="muted">{{service.coser}} · {{service.gender}} · 真人认证</text><text class="price">¥{{service.price}}<text class="price__unit">/小时</text></text></view></view>
+
+  <view class="section">
+    <view class="section__head"><text class="section__title">时间与时长</text><text class="tag tag--success">档期可约</text></view>
+    <picker class="select-row" mode="date" value="{{date}}" start="2026-11-11" bindchange="onDate"><view class="line"><text class="line__title">日期</text><view class="select-row__value"><text>{{date}}</text><view class="control-chevron" aria-hidden="true"></view></view></view></picker>
+    <picker class="select-row" mode="time" value="{{startTime}}" bindchange="onTime"><view class="line"><text class="line__title">开始时间</text><view class="select-row__value"><text>{{startTime}}</text><view class="control-chevron" aria-hidden="true"></view></view></view></picker>
+    <view class="line"><text class="line__title">服务时长</text><view class="stepper"><button bindtap="decrement" disabled="{{duration <= 2}}" aria-label="减少一小时">−</button><text>{{duration}}小时</text><button bindtap="increment" disabled="{{duration >= 8}}" aria-label="增加一小时">＋</button></view></view>
+    <view class="availability"><view class="availability__bar" style="left: 29%; width: {{duration * 8.3}}%;"></view><view class="availability__ticks"><text>10:00</text><text>14:00</text><text>18:00</text><text>22:00</text></view></view>
+    <text class="field-help {{isAvailable ? '' : 'field-error'}}">日历已联动展示 {{startTime}} 起连续 {{duration}} 小时；{{isAvailable ? '当前时间段可约。' : '所选时间包含不可约时段，请重新选择。'}}</text>
+  </view>
+
+  <view class="section">
+    <view class="section__head"><text class="section__title">Coser 可约日历</text><text class="caption">24小时档期</text></view>
+    <view class="booking-dates"><button wx:for="{{bookingDates}}" wx:key="date" class="booking-date {{date === item.date ? 'booking-date--active' : ''}}" data-date="{{item.date}}" bindtap="selectBookingDate"><text>{{item.label}}</text><text>{{item.week}}</text></button></view>
+    <view class="booking-hours" aria-label="Coser 24小时档期"><view wx:for="{{hours}}" wx:key="label" class="booking-hour {{item.open ? 'booking-hour--open' : 'booking-hour--closed'}} {{item.selected ? 'booking-hour--selected' : ''}}"><text>{{item.label}}</text></view></view>
+    <view class="calendar-legend"><view><view class="legend-dot legend-dot--open"></view><text>可约</text></view><view><view class="legend-dot legend-dot--selected"></view><text>已选择</text></view><view><view class="legend-dot"></view><text>不可约</text></view></view>
+  </view>
+
+  <view class="section">
+    <view class="section__head"><text class="section__title">见面地点</text><text class="tag">仅限公共场所</text></view>
+    <button class="place" bindtap="choosePlace"><view><text>{{place || '请选择公共场所'}}</text><text class="muted">平台会校验场所类型和营业时段</text></view><view class="control-chevron" aria-hidden="true"></view></button>
+    <text wx:if="{{errors.place}}" class="field-error">{{errors.place}}</text>
+  </view>
+
+  <view id="boundary-section" class="section">
+    <view class="section__head"><text class="section__title">相处偏好与边界</text><text class="caption">Coser预设</text></view>
+    <button wx:for="{{boundaries}}" wx:key="text" class="boundary-confirm-row {{item.confirmed ? 'boundary-confirm-row--checked' : ''}} {{item.invalid ? 'boundary-confirm-row--invalid' : ''}}" data-index="{{index}}" bindtap="toggleBoundary" aria-pressed="{{item.confirmed}}"><view class="boundary-confirm-row__check">{{item.confirmed ? '✓' : ''}}</view><text>{{item.text}}</text><text>{{item.confirmed ? '已确认' : item.invalid ? '请确认' : '点击确认'}}</text></button>
+    <view class="notice">现场任何互动都以双方当时明确同意为准，可随时撤回。</view>
+  </view>
+
+  <view class="section">
+    <view class="section__head"><text class="section__title">委托前确认</text><text class="caption">双方都能看到</text></view>
+    <label class="field-label">怎么称呼你 *</label><input class="field" data-field="nickname" value="{{nickname}}" bindinput="onField" placeholder="例如：小鱼" /><text wx:if="{{errors.nickname}}" class="field-error">{{errors.nickname}}</text>
+    <label class="field-label">喜欢什么</label><textarea class="field" data-field="likes" value="{{likes}}" bindinput="onField" placeholder="想体验的互动、偏好的聊天方式" />
+    <label class="field-label">不喜欢或需要避开的内容</label><textarea class="field" data-field="dislikes" value="{{dislikes}}" bindinput="onField" placeholder="雷点、忌口、身体状况等" />
+    <label class="field-label">肢体接触边界</label><picker range="{{boundaryOptions}}" bindchange="chooseBoundary"><view class="field picker-field"><text>{{contactBoundary}}</text><view class="control-chevron control-chevron--down" aria-hidden="true"></view></view></picker>
+    <label class="field-label">补充说明</label><textarea class="field" data-field="note" value="{{note}}" bindinput="onField" placeholder="服装、集合方式等其他需求" />
+  </view>
+
+  <view class="section cost"><view class="line"><text>服务金额</text><text>¥{{total}}</text></view><view class="line"><text>用户侧平台服务费</text><text>¥0</text></view><view class="line cost__total"><text>合计</text><text class="price">¥{{total}}</text></view></view>
+  <view class="notice">订单支付后由Coser在24小时内确认；确认后进入待履约。双方确认履约完成后平台再结算给Coser。</view>
+</view>
+<view class="bottom-actions"><button class="btn" bindtap="openChat">私信</button><button class="btn btn--cta" bindtap="submit">提交委托 ¥{{total}}</button></view>
+
+<view wx:if="{{chatOpen}}" class="chat-mask" bindtap="closeChat">
+  <view class="chat-sheet" catchtap="stopTap">
+    <view class="chat-sheet__head"><view><text class="chat-sheet__title">与{{service.coser}}私信</text><text class="chat-sheet__hint">沟通时间、地点和相处边界</text></view><button bindtap="closeChat" aria-label="关闭私信">×</button></view>
+    <scroll-view class="chat-sheet__messages" scroll-y scroll-into-view="chat-bottom"><view wx:for="{{chatMessages}}" wx:key="id" class="chat-bubble {{item.mine ? 'chat-bubble--mine' : ''}}">{{item.text}}</view><view id="chat-bottom"></view></scroll-view>
+    <view wx:if="{{urgent}}" class="urgent-confirm"><view><text>24小时内预约确认</text><text>{{chatConfirmed ? 'Coser已同意该时间，可继续下单' : '需由Coser在聊天中确认时间'}}</text></view><button bindtap="confirmChatTime" disabled="{{chatConfirmed}}">{{chatConfirmed ? '已确认' : '模拟确认'}}</button></view>
+    <view class="chat-compose"><input value="{{chatText}}" bindinput="onChatText" bindconfirm="sendChat" confirm-type="send" placeholder="输入想沟通的内容" /><button bindtap="sendChat">发送</button></view>
+  </view>
+</view>

@@ -1,0 +1,55 @@
+<view class="page detail-page">
+  <view class="profile-hero">
+    <view class="service-head">
+      <text class="service-head__eyebrow">角色委托 · {{service.district}}</text>
+      <text class="service-head__title">{{service.title}}</text>
+      <view class="service-head__price"><view><text class="price">¥{{service.price}}</text><text class="service-head__unit">/小时</text></view><text class="service-head__minimum">每单最低 2 小时</text></view>
+    </view>
+    <view class="person-row">
+      <view class="avatar">{{avatar}}</view>
+      <view class="person-main">
+        <view class="person-name"><text>{{service.coser}}</text><text class="tag tag--success">真人认证</text></view>
+        <view class="person-meta"><text>{{service.gender}} · 上海{{service.district}}</text><text class="online">近期在线</text></view>
+      </view>
+      <view class="profile-actions"><button class="{{favorite ? 'is-favorite' : ''}}" bindtap="toggleFavorite" aria-label="{{favorite ? '取消收藏' : '收藏'}}" aria-pressed="{{favorite}}">{{favorite ? '已收藏' : '收藏'}}</button><button open-type="share" aria-label="分享主页">分享</button></view>
+    </view>
+  </view>
+
+  <view class="section">
+    <view class="section__head"><text class="section__title">关于{{service.coser}}</text></view>
+    <text wx:if="{{isSampleProfile}}" class="body-copy">长期出演《崩坏：星穹铁道》《原神》等角色，擅长漫展同行、主题合影与轻剧情互动。性格开朗，会提前沟通角色设定与活动流程，希望一起留下自然、有趣的回忆。</text>
+    <text wx:else class="body-copy">{{service.coser}}提供「{{service.title}}」委托。具体角色造型、互动形式和集合安排，可在下单前先私信沟通。</text>
+  </view>
+
+  <view class="section">
+    <view class="section__head"><text class="section__title">作品展示</text></view>
+    <view wx:if="{{isSampleProfile}}" class="story-grid"><view class="story story--a"><view class="story__mark">三月七</view><text>三月七 · 漫展同行</text></view><view class="story story--b"><view class="story__mark story__mark--small">✦</view><text>主题合影</text></view><view class="story story--c"><view class="story__mark story__mark--small">✧</view><text>轻剧情互动</text></view></view>
+    <view wx:else class="detail-empty">暂无作品展示，可先私信了解造型与作品</view>
+  </view>
+
+  <view class="section">
+    <view class="section__head"><text class="section__title">已有服装</text><text wx:if="{{isSampleProfile}}" class="caption">4套</text></view>
+    <scroll-view wx:if="{{isSampleProfile}}" scroll-x class="clothes" enhanced show-scrollbar="false"><view wx:for="{{clothes}}" wx:key="name" class="cloth"><view class="cloth__cover"><text class="cloth__mark">{{item.name}}</text></view><text class="cloth__name">{{item.name}}</text><text class="cloth__detail">{{item.detail}}</text></view></scroll-view>
+    <view wx:else class="detail-empty">暂无服装展示，可私信确认可用造型</view>
+  </view>
+
+  <view class="section">
+    <view class="section__head"><text class="section__title">相处偏好与边界</text></view>
+    <view class="boundary-chips"><text wx:for="{{boundaries}}" wx:key="*this" class="boundary-chip">{{item}}</text></view>
+    <text class="boundary-note">仅限公开场所，不接受酒店、住宅、过夜或订单外要求。下单时将逐条确认，以双方更严格的边界为准。</text>
+  </view>
+
+  <view class="section schedule-section">
+    <button class="schedule-toggle" bindtap="toggleSchedule" aria-expanded="{{scheduleOpen}}">
+      <view><text class="schedule-toggle__title">可预约时间</text><text class="schedule-toggle__date">已选 {{selectedDate}}</text></view>
+      <view class="schedule-toggle__action"><text>{{scheduleOpen ? '收起日历' : '展开日历'}}</text><view class="control-chevron {{scheduleOpen ? 'control-chevron--up' : 'control-chevron--down'}} control-chevron--active" aria-hidden="true"></view></view>
+    </button>
+    <view wx:if="{{scheduleOpen}}" class="schedule-content">
+      <view class="dates"><button wx:for="{{dates}}" wx:key="label" class="date {{selectedDate === item.full ? 'date--active' : ''}} {{!item.open ? 'date--closed' : ''}}" data-index="{{index}}" bindtap="selectDate" disabled="{{!item.open}}"><text>{{item.label}}</text><text class="date__sub">{{item.sub}}</text></button></view>
+      <view class="available-copy">可接单：10:00–12:00、14:00–18:00、19:00–22:00</view>
+      <view class="hour-grid" aria-label="24小时可预约档期"><view wx:for="{{hours}}" wx:key="label" class="hour {{item.open ? 'hour--open' : 'hour--closed'}}"><text>{{item.label}}</text></view></view>
+    </view>
+  </view>
+</view>
+
+<view class="bottom-actions"><button class="btn" bindtap="openChat">先咨询</button><button class="btn btn--cta" bindtap="book">选择档期</button></view>

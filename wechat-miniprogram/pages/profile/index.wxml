@@ -1,0 +1,32 @@
+<view class="safe-top profile-head"><view class="profile-head__bar"><text>我的</text></view><view class="person"><view class="avatar">鱼</view><view><view class="person__identity"><text class="person__name">小鱼</text><view wx:if="{{coserVerified && role === 'coser'}}" class="coser-status" aria-label="Coser已认证"><text aria-hidden="true">✓</text></view></view><text class="muted">{{verified ? '已成年 · ' + genderLabel + ' · 同性委托已开启' : '未实名认证'}}</text></view></view><view wx:if="{{coserVerified}}" class="role-switch" role="tablist" aria-label="切换身份"><button class="{{role === 'customer' ? 'active' : ''}}" data-role="customer" bindtap="setRole" aria-selected="{{role === 'customer'}}">用户端</button><button class="{{role === 'coser' ? 'active' : ''}}" data-role="coser" bindtap="setRole" aria-selected="{{role === 'coser'}}">Coser端</button></view></view>
+<view class="page profile-page">
+  <block wx:if="{{role === 'customer'}}">
+    <view class="section commission"><view class="section__head"><text class="section__title">我的委托</text><button bindtap="openOrders">全部委托 ›</button></view><view class="status-grid"><button bindtap="openOrders"><view class="status-icon status-icon--clock"></view><text>待确认</text><text class="count">1</text></button><button bindtap="openOrders"><view class="status-icon status-icon--card"></view><text>待支付</text></button><button bindtap="openOrders"><view class="status-icon status-icon--calendar"></view><text>待履约</text></button><button bindtap="openOrders"><view class="status-icon status-icon--heart"></view><text>待评价</text></button></view></view>
+    <button class="entry" bindtap="openFavorites"><view class="entry__mark">收</view><view><text>我的收藏</text><text>{{favorites}}个心仪委托</text></view><text>›</text></button>
+    <view class="section menu"><button bindtap="openVerification"><text>实名认证</text><text>{{verified ? '已完成' : '去认证'}} ›</text></button><button bindtap="openSafety"><text>安全中心</text><text>{{emergencyContactSet ? '已设置紧急联系人' : '设置紧急联系人'}} ›</text></button><button bindtap="openHelp"><text>帮助与客服</text><text>›</text></button></view>
+  </block>
+  <block wx:else>
+    <view class="section coser-orders">
+      <view class="section__head"><text class="section__title">我的接单</text><button class="section-action" data-filter="all" bindtap="openBOrders">全部订单 ›</button></view>
+      <view class="coser-order-states">
+        <button data-filter="pending" bindtap="openBOrders"><text class="coser-order-states__count {{bPendingCount ? 'coser-order-states__count--alert' : ''}}">{{bPendingCount}}</text><text>待确认</text></button>
+        <button data-filter="service" bindtap="openBOrders"><text class="coser-order-states__count">{{bServiceCount}}</text><text>待履约</text></button>
+        <button data-filter="done" bindtap="openBOrders"><text class="coser-order-states__count">1</text><text>已完成</text></button>
+      </view>
+    </view>
+    <view class="section coser-schedule">
+      <view class="section__head"><text class="section__title">我的档期</text><button class="section-action" bindtap="openBCalendar">调整档期 ›</button></view>
+      <text class="coser-schedule__month">{{scheduleMonth}}</text>
+      <view class="coser-schedule__week"><text>一</text><text>二</text><text>三</text><text>四</text><text>五</text><text>六</text><text>日</text></view>
+      <view class="coser-schedule__grid"><view wx:for="{{schedulePreview}}" wx:key="key" class="coser-schedule__day {{item.blank ? 'coser-schedule__day--blank' : item.open ? 'coser-schedule__day--open' : ''}} {{item.today ? 'coser-schedule__day--today' : ''}}"><text wx:if="{{!item.blank}}">{{item.date}}</text><view wx:if="{{!item.blank}}" class="coser-schedule__dot"></view></view></view>
+      <view class="coser-schedule__legend"><view class="coser-schedule__legend-item"><view class="coser-schedule__legend-open"></view><text>可约</text></view><view class="coser-schedule__legend-item"><view class="coser-schedule__legend-closed"></view><text>不可约</text></view></view>
+    </view>
+    <view class="section coser-settlement">
+      <view class="section__head"><text class="section__title">结算与保障</text></view>
+      <view class="line"><text>待结算</text><text class="line__value">¥1,742</text></view>
+      <view class="line"><text>本月已结算</text><text class="line__value">¥5,920</text></view>
+      <view class="line"><text>平台保证金</text><text class="line__value">¥500 · 已缴纳</text></view>
+      <view class="line"><text>收款方式</text><text class="line__value">微信收款</text></view>
+    </view>
+  </block>
+</view>

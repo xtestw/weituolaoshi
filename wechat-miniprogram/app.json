@@ -1,0 +1,45 @@
+{
+  "pages": [
+    "pages/home/index",
+    "pages/search/index",
+    "pages/coser/index",
+    "pages/booking/index",
+    "pages/verify/index",
+    "pages/orders/index",
+    "pages/order-detail/index",
+    "pages/messages/index",
+    "pages/chat/index",
+    "pages/profile/index",
+    "pages/favorites/index",
+    "pages/safety/index",
+    "pages/publish/index",
+    "pages/post-editor/index",
+    "pages/b-dashboard/index",
+    "pages/b-orders/index",
+    "pages/b-calendar/index",
+    "pages/b-profile/index"
+  ],
+  "window": {
+    "navigationBarBackgroundColor": "#ffffff",
+    "navigationBarTextStyle": "black",
+    "navigationBarTitleText": "次元委托",
+    "backgroundColor": "#f7f7fb",
+    "backgroundTextStyle": "dark"
+  },
+  "permission": { "scope.userLocation": { "desc": "用于定位Coser服务城市和选择城区内公共交易地点" } },
+  "tabBar": {
+    "custom": true,
+    "color": "#7b7481",
+    "selectedColor": "#5b67f1",
+    "backgroundColor": "#ffffff",
+    "borderStyle": "white",
+    "list": [
+      { "pagePath": "pages/home/index", "text": "首页" },
+      { "pagePath": "pages/publish/index", "text": "Coser发布" },
+      { "pagePath": "pages/messages/index", "text": "消息" },
+      { "pagePath": "pages/profile/index", "text": "我的" }
+    ]
+  },
+  "sitemapLocation": "sitemap.json",
+  "lazyCodeLoading": "requiredComponents"
+}
