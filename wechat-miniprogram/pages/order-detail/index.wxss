@@ -24,3 +24,5 @@
 .identity-result { margin-top: 20rpx; padding: 18rpx; display: flex; align-items: center; gap: 14rpx; border-radius: 18rpx; background: var(--color-success-soft); color: var(--color-success); font-size: 25rpx; font-weight: 700; }
 .identity-result view { width: 40rpx; height: 40rpx; border-radius: 50%; background: var(--color-success); color: #fff; line-height: 40rpx; text-align: center; }
 .safety-card { margin-bottom: 20rpx; }
+.checkin-code { display: block; margin: 18rpx 0; color: var(--color-primary); font-size: 64rpx; font-weight: 800; letter-spacing: 12rpx; text-align: center; font-variant-numeric: tabular-nums; }
+.emergency-float { position: fixed; z-index: 999; right: 24rpx; bottom: calc(150rpx + env(safe-area-inset-bottom)); min-width: 176rpx; height: 88rpx; margin: 0; padding: 0 20rpx; display: flex; align-items: center; justify-content: center; border: 2rpx solid #fff; border-radius: 999rpx; background: #c9384f; color: #fff; font-size: 26rpx; font-weight: 800; box-shadow: 0 10rpx 32rpx rgba(114,25,45,.3); }
