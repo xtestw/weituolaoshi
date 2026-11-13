@@ -6,7 +6,6 @@
 .filter__label { max-width: 190rpx; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .filter__chevron { width: 12rpx; height: 12rpx; color: currentColor; }
 .filter__fixed { color: var(--color-muted); font-size: 20rpx; font-weight: 600; }
-.filter--locked { border-color: #d8d5e2; background: #f5f3fa; color: var(--color-text); }
 .filter--active,.filter--open { border-color: #b8c0ff; background: var(--color-primary-soft); color: var(--color-primary-ink); }
 .filter--open .filter__chevron { transform: rotate(225deg) translateY(-3rpx); }
 .filter:active { background: var(--color-primary-soft); }
