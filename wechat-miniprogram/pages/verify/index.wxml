@@ -6,6 +6,6 @@
     <checkbox-group bindchange="onAgree"><label class="agreement"><checkbox value="agree" color="#5b67f1" /><text>我已阅读并同意《身份信息处理规则》和《用户协议》</text></label></checkbox-group>
     <text wx:if="{{errors.agreed}}" class="field-error">{{errors.agreed}}</text>
   </view>
-  <view class="notice"><text>平台只在服务端完成核验。正式上线时，此页面会调用合规实名认证服务，前端不会保存完整身份证号。</text></view>
+  <view class="notice"><text>身份信息仅用于服务端实名核验。证件号码不会保存在小程序本地；平台只保留脱敏号码和核验结果。</text></view>
   <button class="btn btn--primary submit" bindtap="submit" loading="{{submitting}}" disabled="{{submitting}}">{{submitting ? '正在核验' : '同意授权并完成认证'}}</button>
 </view>

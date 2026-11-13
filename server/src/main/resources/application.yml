@@ -1,0 +1,27 @@
+server:
+  port: 8080
+spring:
+  datasource:
+    url: jdbc:h2:file:./data/weituolaoshi;MODE=PostgreSQL;DATABASE_TO_LOWER=TRUE
+    username: sa
+    password: ''
+  flyway:
+    enabled: true
+  jackson:
+    default-property-inclusion: non_null
+  servlet:
+    multipart:
+      max-file-size: 2MB
+      max-request-size: 3MB
+wechat:
+  app-id: ${WECHAT_APP_ID:}
+  app-secret: ${WECHAT_APP_SECRET:}
+account:
+  avatar-directory: ${AVATAR_DIRECTORY:./data/avatars}
+identity:
+  provider-url: ${IDENTITY_PROVIDER_URL:}
+  provider-key: ${IDENTITY_PROVIDER_KEY:}
+  digest-key: ${IDENTITY_DIGEST_KEY:}
+admin:
+  bootstrap-user: ${ADMIN_BOOTSTRAP_USER:}
+  bootstrap-password: ${ADMIN_BOOTSTRAP_PASSWORD:}

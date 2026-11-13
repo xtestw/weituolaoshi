@@ -1,0 +1,15 @@
+ALTER TABLE identity_verification ADD COLUMN mode VARCHAR(20) DEFAULT 'customer' NOT NULL;
+ALTER TABLE identity_verification ADD COLUMN review_reason VARCHAR(500);
+CREATE UNIQUE INDEX uq_identity_document_digest ON identity_verification(document_digest);
+UPDATE identity_verification SET mode='coser' WHERE user_id IN (SELECT id FROM app_user WHERE role='coser');
+CREATE TABLE admin_user (id VARCHAR(64) PRIMARY KEY, username VARCHAR(80) UNIQUE NOT NULL, password_hash VARCHAR(256) NOT NULL, enabled BOOLEAN DEFAULT TRUE NOT NULL);
+CREATE TABLE admin_role (id VARCHAR(64) PRIMARY KEY, name VARCHAR(80) NOT NULL);
+CREATE TABLE admin_permission (code VARCHAR(80) PRIMARY KEY, description VARCHAR(200) NOT NULL);
+CREATE TABLE admin_user_role (user_id VARCHAR(64) REFERENCES admin_user(id), role_id VARCHAR(64) REFERENCES admin_role(id), PRIMARY KEY(user_id,role_id));
+CREATE TABLE admin_role_permission (role_id VARCHAR(64) REFERENCES admin_role(id), permission_code VARCHAR(80) REFERENCES admin_permission(code), PRIMARY KEY(role_id,permission_code));
+CREATE TABLE admin_session (token_hash VARCHAR(64) PRIMARY KEY, user_id VARCHAR(64) REFERENCES admin_user(id), expires_at TIMESTAMP NOT NULL);
+CREATE TABLE admin_audit (id VARCHAR(64) PRIMARY KEY, actor_id VARCHAR(64) REFERENCES admin_user(id), action VARCHAR(100) NOT NULL, target_id VARCHAR(100), detail VARCHAR(500), created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL);
+INSERT INTO admin_role VALUES ('super_admin','超级管理员'),('reviewer','认证审核员'),('viewer','只读管理员');
+INSERT INTO admin_permission VALUES ('identity:read','查看认证'),('identity:review','审核认证'),('users:read','查看用户'),('admins:read','查看管理员'),('admins:write','管理管理员'),('audit:read','查看审计');
+INSERT INTO admin_role_permission SELECT 'super_admin',code FROM admin_permission;
+INSERT INTO admin_role_permission VALUES ('reviewer','identity:read'),('reviewer','identity:review'),('viewer','identity:read');
