@@ -8,3 +8,11 @@
 .order .btn-row { margin-top: 22rpx; }
 .order .btn-row { flex-wrap: wrap; }
 .order .btn-row .btn { flex: 1 1 28%; min-width: 0; padding-left: 8rpx; padding-right: 8rpx; font-size: 24rpx; }
+.emergency-float { position: fixed; z-index: 1100; right: 24rpx; top: 220rpx; min-width: 176rpx; height: 88rpx; margin: 0; padding: 0 20rpx; display: flex; align-items: center; justify-content: center; border: 2rpx solid #fff; border-radius: 999rpx; background: #c9384f; color: #fff; font-size: 26rpx; font-weight: 800; box-shadow: 0 10rpx 32rpx rgba(114,25,45,.3); }
+.checkin-mask { position: fixed; z-index: 1000; inset: 0; display: flex; align-items: flex-end; background: rgba(25,20,32,.48); }
+.checkin-sheet { width: 100%; padding: 30rpx 30rpx calc(30rpx + env(safe-area-inset-bottom)); box-sizing: border-box; border-radius: 32rpx 32rpx 0 0; background: #fff; }
+.checkin-sheet .section__head button { width: 88rpx; height: 88rpx; margin: 0; padding: 0; border: 0; background: transparent; color: var(--color-muted); font-size: 42rpx; }
+.checkin-sheet .muted { display: block; margin: 10rpx 0 20rpx; }
+.checkin-sheet .btn { width: 100%; margin: 12rpx 0; }
+.checkin-input { height: 96rpx; margin: 16rpx 0; padding: 0 22rpx; border: 1rpx solid var(--color-border); border-radius: 18rpx; background: var(--color-bg); font-size: 30rpx; }
+.checkin-preview { width: 120rpx; height: 120rpx; margin: 12rpx 0; border-radius: 14rpx; }
