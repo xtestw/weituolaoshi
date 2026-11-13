@@ -1,21 +1,17 @@
 const { get, set } = require('../../utils/store')
 const { cityFromCoordinates } = require('../../utils/cities')
-const { request } = require('../../services/api')
+const { guardBooking } = require('../../utils/eligibility')
 
 Page({
   data: { verified: false, reviewStatus: 'unverified', reviewReason: '', posts: [], coserCity: '' },
   onShow() {
     if (typeof this.getTabBar === 'function' && this.getTabBar()) this.getTabBar().setData({ selected: 1 })
-    const review = wx.getStorageSync('account_token') ? get('coserVerification', { status: 'unverified', reason: '' }) : { status: 'unverified', reason: '' }
+    const review = get('coserVerification', { status: 'unverified', reason: '' })
     this.setData({ verified: review.status === 'verified', reviewStatus: review.status, reviewReason: review.reason || '', posts: get('posts', []), coserCity: get('coserCity', '') })
-    if (wx.getStorageSync('account_token')) request('/v1/identity/me').then(result => {
-      if (result.mode !== 'coser') return
-      set('coserVerification', { status: result.status, reason: result.reason || '' })
-      this.setData({ verified: result.status === 'verified', reviewStatus: result.status, reviewReason: result.reason || '' })
-    }).catch(() => {})
+    if (review.status === 'pending') this.simulateReview()
   },
   newPost() {
-    if (!wx.getStorageSync('account_token')) return wx.showModal({ title: '请先登录', content: '请先在“我的”页面完成微信登录。', showCancel: false })
+    if (get('verification', null) && !guardBooking()) return
     if (this.data.reviewStatus === 'pending') return wx.showModal({ title: '认证审核中', content: '审核结果会通过平台消息通知，通过后即可发布帖子。', showCancel: false })
     if (!this.data.verified) return wx.navigateTo({ url: '/pages/verify/index?returnTo=publish&mode=coser' })
     if (!this.data.coserCity) return this.locateCity(() => wx.navigateTo({ url: '/pages/post-editor/index' }))
@@ -32,6 +28,16 @@ Page({
     }, fail: () => wx.showToast({ title: '请允许定位后重试', icon: 'none' }) })
   },
   refreshCity() { this.locateCity() },
+  simulateReview() {
+    clearTimeout(this.reviewTimer)
+    this.reviewTimer = setTimeout(() => {
+      const result = { status: 'verified', reason: '', verifiedAt: Date.now() }
+      set('coserVerification', result)
+      this.setData({ verified: true, reviewStatus: 'verified' })
+      wx.showModal({ title: '真人认证已通过', content: '审核结果已同步到平台消息，现在可以发布帖子。', confirmText: '去发布', success: ({ confirm }) => confirm && this.newPost() })
+    }, 1200)
+  },
+  onUnload() { clearTimeout(this.reviewTimer) },
   viewHomepage() { wx.navigateTo({ url: '/pages/coser/index?id=mine' }) },
   edit(event) {
     const post = this.data.posts[event.currentTarget.dataset.index]
