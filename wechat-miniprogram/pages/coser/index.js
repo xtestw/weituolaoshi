@@ -1,5 +1,7 @@
 const { get, set } = require('../../utils/store')
 const { services } = require('../../utils/services')
+const { nextDays } = require('../../utils/availability')
+const { guardBooking } = require('../../utils/eligibility')
 
 Page({
   data: {
@@ -9,14 +11,10 @@ Page({
     isSampleProfile: true,
     favorite: false,
     scheduleOpen: false,
-    selectedDate: '11月16日 周一',
-    dates: [
-      { label: '11/16', sub: '周一', full: '11月16日 周一', open: true },
-      { label: '11/17', sub: '周二', full: '11月17日 周二', open: true },
-      { label: '11/18', sub: '周三', full: '11月18日 周三', open: false },
-      { label: '11/21', sub: '周六', full: '11月21日 周六', open: true }
-    ],
-    hours: Array.from({ length: 24 }, (_, hour) => ({ label: String(hour).padStart(2, '0'), open: (hour >= 10 && hour < 12) || (hour >= 14 && hour < 18) || (hour >= 19 && hour < 22) })),
+    selectedDate: '',
+    selectedDateKey: '',
+    dates: [],
+    reputation: { score: '—', scoredOrders: 0, incompleteCount: 0, sample: false },
     boundaries: ['不接受肢体接触', '轻挽手臂', '不饮酒'],
     clothes: [
       { name: '三月七·巡猎', detail: '全套 · 含假发道具' },
@@ -28,7 +26,19 @@ Page({
   onLoad(options) {
     const serviceId = options.id || 'svc-1'
     const service = services.find((item) => item.id === serviceId) || services[0]
-    this.setData({ serviceId: service.id, service, avatar: service.coser.slice(-1), isSampleProfile: service.id === 'svc-1', favorite: get('favorites', []).includes(service.id) })
+    const dates = nextDays(service)
+    const firstOpen = dates.find((item) => item.open)
+    this.setData({ serviceId: service.id, service, dates, selectedDate: firstOpen ? firstOpen.full : '暂无可约日期', selectedDateKey: firstOpen ? firstOpen.key : '', avatar: service.coser.slice(-1), isSampleProfile: service.id === 'svc-1', favorite: get('favorites', []).includes(service.id) })
+    this.refreshReputation()
+  },
+  onShow() { if (this.data.serviceId) this.refreshReputation() },
+  refreshReputation() {
+    const service = this.data.service
+    const coserId = service.id === 'svc-1' ? 'mine' : service.id
+    const reviews = Array.from(new Map(get('orderReviews', []).filter((item) => item.coserId === coserId && Number(item.score) >= 1 && Number(item.score) <= 5).map((item) => [item.orderId, item])).values())
+    const cases = get('responsibilityCases', [])
+    const incompleteCount = new Set(cases.filter((item) => item.coserId === coserId && item.status === 'approved' && item.decision === 'coser' && item.fulfillmentIncomplete).map((item) => item.orderId)).size
+    this.setData({ reputation: { score: reviews.length ? (reviews.reduce((sum, item) => sum + Number(item.score), 0) / reviews.length).toFixed(1) : service.rating ? Number(service.rating).toFixed(1) : '—', scoredOrders: reviews.length, incompleteCount, sample: !reviews.length && !!service.rating } })
   },
   toggleFavorite() {
     const favorites = get('favorites', [])
@@ -39,12 +49,12 @@ Page({
   },
   selectDate(event) {
     const item = this.data.dates[event.currentTarget.dataset.index]
-    if (!item.open) return wx.showToast({ title: '当天暂无可约时间', icon: 'none' })
-    this.setData({ selectedDate: item.full })
+    if (!item.open) return wx.showToast({ title: '该日期不可约', icon: 'none' })
+    this.setData({ selectedDate: item.full, selectedDateKey: item.key })
   },
   toggleSchedule() { this.setData({ scheduleOpen: !this.data.scheduleOpen }) },
   openChat() { wx.navigateTo({ url: `/pages/chat/index?name=${encodeURIComponent(this.data.service.coser)}` }) },
-  book() { wx.navigateTo({ url: `/pages/booking/index?id=${this.data.serviceId}` }) },
+  book() { if (guardBooking()) wx.navigateTo({ url: `/pages/booking/index?id=${this.data.serviceId}&date=${this.data.selectedDateKey}` }) },
   onShareAppMessage() {
     return { title: this.data.service.title, path: `/pages/coser/index?id=${this.data.serviceId}` }
   }

@@ -22,6 +22,13 @@
 .profile-actions { flex: none; display: flex; gap: 8rpx; }
 .profile-actions button { flex: none; width: 100rpx; min-height: 76rpx; box-sizing: border-box; padding: 0; margin: 0; display: flex; align-items: center; justify-content: center; border: 1rpx solid var(--color-border); border-radius: 999rpx; background: #fff; color: var(--color-primary); font-size: 22rpx; line-height: 1.2; font-weight: 700; white-space: nowrap; }
 .profile-actions .is-favorite { border-color: #eab6d0; background: var(--color-cta-soft); color: #a82968; }
+.reputation-heading { margin-top: 26rpx; color: var(--color-text); font-size: 26rpx; line-height: 1.35; font-weight: 800; }
+.reputation { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 12rpx; margin-top: 12rpx; }
+.reputation>view { min-height: 102rpx; padding: 14rpx 18rpx; box-sizing: border-box; border-radius: 18rpx; background: var(--color-primary-soft); }
+.reputation text { display: block; }
+.reputation__value { color: var(--color-primary-ink); font-size: 32rpx; font-weight: 800; font-variant-numeric: tabular-nums; }
+.reputation__label { margin-top: 4rpx; color: var(--color-muted); font-size: 22rpx; line-height: 1.35; }
+.reputation__note { display: block; margin-top: 12rpx; color: var(--color-muted); font-size: 21rpx; line-height: 1.4; }
 .detail-empty { min-height: 140rpx; padding: 24rpx; box-sizing: border-box; display: flex; align-items: center; justify-content: center; border-radius: 20rpx; background: var(--color-bg); color: var(--color-muted); font-size: 24rpx; text-align: center; }
 .title-row { display: flex; justify-content: space-between; gap: 20rpx; }
 .title-row>view:first-child { flex: 1; min-width: 0; }

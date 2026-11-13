@@ -13,6 +13,9 @@
       </view>
       <view class="profile-actions"><button class="{{favorite ? 'is-favorite' : ''}}" bindtap="toggleFavorite" aria-label="{{favorite ? '取消收藏' : '收藏'}}" aria-pressed="{{favorite}}">{{favorite ? '已收藏' : '收藏'}}</button><button open-type="share" aria-label="分享主页">分享</button></view>
     </view>
+    <view class="reputation-heading">信誉表现</view>
+    <view class="reputation"><view><text class="reputation__value">★ {{reputation.score}}</text><text class="reputation__label">{{reputation.sample ? '示例评分' : '累计交易评分'}} · {{reputation.scoredOrders}}笔已评分</text></view><view><text class="reputation__value">{{reputation.incompleteCount}}次</text><text class="reputation__label">应履约未完成</text></view></view>
+    <text class="reputation__note">未履约次数仅计平台审核确认属于Coser责任的订单。</text>
   </view>
 
   <view class="section">
@@ -41,15 +44,14 @@
 
   <view class="section schedule-section">
     <button class="schedule-toggle" bindtap="toggleSchedule" aria-expanded="{{scheduleOpen}}">
-      <view><text class="schedule-toggle__title">可预约时间</text><text class="schedule-toggle__date">已选 {{selectedDate}}</text></view>
+      <view><text class="schedule-toggle__title">可预约日期</text><text class="schedule-toggle__date">{{selectedDateKey ? '已选 ' : ''}}{{selectedDate}}</text></view>
       <view class="schedule-toggle__action"><text>{{scheduleOpen ? '收起日历' : '展开日历'}}</text><view class="control-chevron {{scheduleOpen ? 'control-chevron--up' : 'control-chevron--down'}} control-chevron--active" aria-hidden="true"></view></view>
     </button>
     <view wx:if="{{scheduleOpen}}" class="schedule-content">
-      <view class="dates"><button wx:for="{{dates}}" wx:key="label" class="date {{selectedDate === item.full ? 'date--active' : ''}} {{!item.open ? 'date--closed' : ''}}" data-index="{{index}}" bindtap="selectDate" disabled="{{!item.open}}"><text>{{item.label}}</text><text class="date__sub">{{item.sub}}</text></button></view>
-      <view class="available-copy">可接单：10:00–12:00、14:00–18:00、19:00–22:00</view>
-      <view class="hour-grid" aria-label="24小时可预约档期"><view wx:for="{{hours}}" wx:key="label" class="hour {{item.open ? 'hour--open' : 'hour--closed'}}"><text>{{item.label}}</text></view></view>
+      <view class="dates"><button wx:for="{{dates}}" wx:key="key" class="date {{selectedDateKey === item.key ? 'date--active' : ''}} {{!item.open ? 'date--closed' : ''}}" data-index="{{index}}" bindtap="selectDate" disabled="{{!item.open}}" aria-label="{{item.full}}，{{item.open ? '可约' : '不可约'}}"><text>{{item.label}}</text><text class="date__sub">{{item.open ? '可约' : '不可约'}}</text></button></view>
+      <view class="available-copy">按日期展示可约状态。具体开始时间与服务时长在下单时填写，21:00–07:00 不可约。</view>
     </view>
   </view>
 </view>
 
-<view class="bottom-actions"><button class="btn" bindtap="openChat">先咨询</button><button class="btn btn--cta" bindtap="book">选择档期</button></view>
+<view class="bottom-actions"><button class="btn" bindtap="openChat">先咨询</button><button class="btn btn--cta" bindtap="book" disabled="{{!selectedDateKey}}">{{selectedDateKey ? '选择日期下单' : '暂无可约日期'}}</button></view>
