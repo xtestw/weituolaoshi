@@ -27,17 +27,17 @@
       </view>
       <button class="calendar-sheet__close" bindtap="closeCalendar" aria-label="关闭日历">×</button>
     </view>
-    <view class="calendar-sheet__month">2026年11月</view>
+    <view class="calendar-sheet__month">{{calendarMonthLabel}}</view>
     <view class="calendar-week"><text class="calendar-week__day" wx:for="{{calendarWeekdays}}" wx:key="*this">{{item}}</text></view>
     <view class="calendar-grid">
       <view wx:for="{{calendarDays}}" wx:key="key" class="calendar-cell {{item.blank ? 'calendar-cell--blank' : ''}} {{!item.blank && item.day >= calendarStart && item.day <= (calendarEnd || calendarStart) ? 'calendar-cell--range' : ''}} {{item.day === calendarStart || item.day === calendarEnd ? 'calendar-cell--edge' : ''}}">
-        <button class="calendar-cell__button" wx:if="{{!item.blank}}" data-day="{{item.day}}" bindtap="chooseCalendarDay" aria-label="11月{{item.day}}日">{{item.day}}</button>
+        <button class="calendar-cell__button" wx:if="{{!item.blank}}" data-day="{{item.day}}" bindtap="chooseCalendarDay" disabled="{{item.past}}" aria-label="{{calendarMonthNumber}}月{{item.day}}日{{item.past ? '，已过去' : ''}}">{{item.day}}</button>
       </view>
     </view>
     <view class="calendar-summary">
-      <text>开始</text><text class="calendar-summary__value">11.{{calendarStart < 10 ? '0' + calendarStart : calendarStart}}</text>
+      <text>开始</text><text class="calendar-summary__value">{{calendarMonthNumber}}.{{calendarStart < 10 ? '0' + calendarStart : calendarStart}}</text>
       <view class="calendar-summary__line"></view>
-      <text>结束</text><text class="calendar-summary__value">{{calendarEnd ? '11.' + (calendarEnd < 10 ? '0' + calendarEnd : calendarEnd) : '请选择'}}</text>
+      <text>结束</text><text class="calendar-summary__value">{{calendarEnd ? calendarMonthNumber + '.' + (calendarEnd < 10 ? '0' + calendarEnd : calendarEnd) : '请选择'}}</text>
     </view>
     <button class="calendar-confirm" bindtap="confirmCalendar">确认日期</button>
   </view>
