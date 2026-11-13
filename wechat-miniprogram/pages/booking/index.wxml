@@ -2,18 +2,16 @@
   <view class="section service-summary"><view class="summary-cover"><text>{{service.mark}}</text></view><view><text class="section__title">{{service.title}}</text><text class="muted">{{service.coser}} · {{service.gender}} · 真人认证</text><text class="price">¥{{service.price}}<text class="price__unit">/小时</text></text></view></view>
 
   <view class="section">
-    <view class="section__head"><text class="section__title">时间与时长</text><text class="tag tag--success">档期可约</text></view>
-    <picker class="select-row" mode="date" value="{{date}}" start="2026-11-11" bindchange="onDate"><view class="line"><text class="line__title">日期</text><view class="select-row__value"><text>{{date}}</text><view class="control-chevron" aria-hidden="true"></view></view></view></picker>
+    <view class="section__head"><text class="section__title">时间与时长</text><text class="tag {{dayAvailable ? 'tag--success' : ''}}">{{dayAvailable ? '所选日期可约' : '所选日期不可约'}}</text></view>
+    <picker class="select-row" mode="date" value="{{date}}" start="{{minDate}}" bindchange="onDate"><view class="line"><text class="line__title">日期</text><view class="select-row__value"><text>{{date}}</text><view class="control-chevron" aria-hidden="true"></view></view></view></picker>
     <picker class="select-row" mode="time" value="{{startTime}}" bindchange="onTime"><view class="line"><text class="line__title">开始时间</text><view class="select-row__value"><text>{{startTime}}</text><view class="control-chevron" aria-hidden="true"></view></view></view></picker>
     <view class="line"><text class="line__title">服务时长</text><view class="stepper"><button bindtap="decrement" disabled="{{duration <= 2}}" aria-label="减少一小时">−</button><text>{{duration}}小时</text><button bindtap="increment" disabled="{{duration >= 8}}" aria-label="增加一小时">＋</button></view></view>
-    <view class="availability"><view class="availability__bar" style="left: 29%; width: {{duration * 8.3}}%;"></view><view class="availability__ticks"><text>10:00</text><text>14:00</text><text>18:00</text><text>22:00</text></view></view>
-    <text class="field-help {{isAvailable ? '' : 'field-error'}}">日历已联动展示 {{startTime}} 起连续 {{duration}} 小时；{{isAvailable ? '当前时间段可约。' : '所选时间包含不可约时段，请重新选择。'}}</text>
+    <text class="field-help {{isAvailable ? '' : 'field-error'}}">{{!dayAvailable ? '所选日期不可约，请更换日期。' : !timeAllowed ? '服务时间须在07:00–21:00内，且不可跨夜。' : !isAvailable ? '请选择未来时间。' : '日期可约；所填时间将在Coser确认订单后生效。'}}</text>
   </view>
 
   <view class="section">
-    <view class="section__head"><text class="section__title">Coser 可约日历</text><text class="caption">24小时档期</text></view>
-    <view class="booking-dates"><button wx:for="{{bookingDates}}" wx:key="date" class="booking-date {{date === item.date ? 'booking-date--active' : ''}}" data-date="{{item.date}}" bindtap="selectBookingDate"><text>{{item.label}}</text><text>{{item.week}}</text></button></view>
-    <view class="booking-hours" aria-label="Coser 24小时档期"><view wx:for="{{hours}}" wx:key="label" class="booking-hour {{item.open ? 'booking-hour--open' : 'booking-hour--closed'}} {{item.selected ? 'booking-hour--selected' : ''}}"><text>{{item.label}}</text></view></view>
+    <view class="section__head"><text class="section__title">Coser 可约日期</text><text class="caption">按日展示</text></view>
+    <view class="booking-dates"><button wx:for="{{bookingDates}}" wx:key="date" class="booking-date {{date === item.date ? 'booking-date--active' : ''}} {{!item.open ? 'booking-date--closed' : ''}}" data-date="{{item.date}}" bindtap="selectBookingDate" disabled="{{!item.open}}" aria-label="{{item.full}}，{{item.open ? '可约' : '不可约'}}"><text>{{item.label}}</text><text>{{item.open ? '可约' : '不可约'}}</text></button></view>
     <view class="calendar-legend"><view><view class="legend-dot legend-dot--open"></view><text>可约</text></view><view><view class="legend-dot legend-dot--selected"></view><text>已选择</text></view><view><view class="legend-dot"></view><text>不可约</text></view></view>
   </view>
 

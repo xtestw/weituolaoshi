@@ -1,30 +1,26 @@
 const { get, set } = require('../../utils/store')
 const { services } = require('../../utils/services')
 const { validateVenue } = require('../../utils/cities')
+const { keyForDate, isBookableDay, nextDays } = require('../../utils/availability')
+const { guardBooking } = require('../../utils/eligibility')
 
-const isOpenHour = (hour) => (hour >= 10 && hour < 12) || (hour >= 14 && hour < 18) || (hour >= 19 && hour < 22)
-const buildHours = (startTime, duration) => {
-  const start = Number(String(startTime).split(':')[0])
-  return Array.from({ length: 24 }, (_, hour) => ({
-    label: String(hour).padStart(2, '0'),
-    open: isOpenHour(hour),
-    selected: hour >= start && hour < start + duration
-  }))
+const withinServiceHours = (startTime, duration) => {
+  const [hour, minute] = String(startTime).split(':').map(Number)
+  const start = hour * 60 + minute
+  return Number.isFinite(start) && start >= 7 * 60 && start + duration * 60 <= 21 * 60
 }
+const hoursUntil = (date, startTime) => (new Date(`${date}T${startTime}:00`).getTime() - Date.now()) / 3600000
 
 Page({
   data: {
     service: services[0],
-    date: '2026-11-16',
-    bookingDates: [
-      { date: '2026-11-16', label: '11/16', week: '周一' },
-      { date: '2026-11-17', label: '11/17', week: '周二' },
-      { date: '2026-11-21', label: '11/21', week: '周六' },
-      { date: '2026-11-22', label: '11/22', week: '周日' }
-    ],
+    date: '',
+    minDate: '',
+    bookingDates: [],
     startTime: '14:00',
     duration: 3,
-    hours: buildHours('14:00', 3),
+    dayAvailable: true,
+    timeAllowed: true,
     isAvailable: true,
     place: '',
     placeDetails: null,
@@ -51,18 +47,24 @@ Page({
   },
   onLoad(options) {
     const service = services.find((item) => item.id === options.id) || services[0]
-    this.setData({ service, total: service.price * this.data.duration })
+    const bookingDates = nextDays(service, 14).map((item) => ({ ...item, date: item.key, week: item.sub }))
+    const minDate = keyForDate(new Date())
+    const date = options.date && isBookableDay(service, options.date) ? options.date : minDate
+    const dayAvailable = isBookableDay(service, date)
+    const timeAllowed = withinServiceHours(this.data.startTime, this.data.duration)
+    this.setData({ service, bookingDates, minDate, date, dayAvailable, timeAllowed, isAvailable: dayAvailable && timeAllowed && hoursUntil(date, this.data.startTime) > 0, urgent: hoursUntil(date, this.data.startTime) > 0 && hoursUntil(date, this.data.startTime) < 24, total: service.price * this.data.duration })
   },
   refreshSchedule(next = {}) {
     const startTime = next.startTime || this.data.startTime
     const duration = next.duration || this.data.duration
-    const hours = buildHours(startTime, duration)
-    const selected = hours.filter((item) => item.selected)
-    this.setData({ ...next, hours, isAvailable: selected.length === duration && selected.every((item) => item.open), total: this.data.service.price * duration })
+    const timeAllowed = withinServiceHours(startTime, duration)
+    const hoursToStart = hoursUntil(this.data.date, startTime)
+    this.setData({ ...next, timeAllowed, isAvailable: this.data.dayAvailable && timeAllowed && hoursToStart > 0, urgent: hoursToStart > 0 && hoursToStart < 24, chatConfirmed: false, total: this.data.service.price * duration })
   },
   updateDate(date) {
-    const hoursToStart = (new Date(`${date}T${this.data.startTime}:00`).getTime() - Date.now()) / 3600000
-    this.setData({ date, urgent: hoursToStart > 0 && hoursToStart < 24, chatConfirmed: false })
+    const hoursToStart = hoursUntil(date, this.data.startTime)
+    const dayAvailable = isBookableDay(this.data.service, date)
+    this.setData({ date, dayAvailable, isAvailable: dayAvailable && this.data.timeAllowed && hoursToStart > 0, urgent: hoursToStart > 0 && hoursToStart < 24, chatConfirmed: false })
   },
   onDate(event) { this.updateDate(event.detail.value) },
   selectBookingDate(event) { this.updateDate(event.currentTarget.dataset.date) },
@@ -98,11 +100,14 @@ Page({
     this.setData({ chatMessages: this.data.chatMessages.concat({ id: `m-${Date.now()}`, text, mine: true }), chatText: '' })
   },
   confirmChatTime() {
-    this.setData({ chatConfirmed: true, chatMessages: this.data.chatMessages.concat({ id: `m-${Date.now()}`, text: `已确认 ${this.data.date} ${this.data.startTime} 开始，档期暂时保留30分钟。`, mine: false }) })
+    this.setData({ chatConfirmed: true, chatMessages: this.data.chatMessages.concat({ id: `m-${Date.now()}`, text: `已确认 ${this.data.date} ${this.data.startTime} 开始。付款后仍需Coser确认订单。`, mine: false }) })
   },
   submit() {
+    if (!guardBooking()) return
     const errors = {}
-    if (!this.data.isAvailable) return wx.showToast({ title: '所选时段不可约', icon: 'none' })
+    if (!this.data.dayAvailable) return wx.showToast({ title: '所选日期不可约', icon: 'none' })
+    if (!this.data.timeAllowed) return wx.showToast({ title: '服务须在07:00–21:00内结束', icon: 'none' })
+    if (hoursUntil(this.data.date, this.data.startTime) <= 0) return wx.showToast({ title: '请选择未来时间', icon: 'none' })
     if (this.data.urgent && !this.data.chatConfirmed) {
       this.setData({ chatOpen: true })
       return wx.showToast({ title: '请先在私信中确认时间', icon: 'none' })
@@ -124,9 +129,9 @@ Page({
         id,
         title: this.data.service.title,
         coser: this.data.service.coser,
-        coserGender: this.data.service.gender === '男' ? 'M' : 'F',
+        coserGender: 'F',
         customer: this.data.nickname.trim(),
-        date: `${this.data.date} ${this.data.startTime}–${String(Number(this.data.startTime.slice(0, 2)) + this.data.duration).padStart(2, '0')}:00`,
+        date: `${this.data.date} ${this.data.startTime}–${String(Math.floor((Number(this.data.startTime.slice(0, 2)) * 60 + Number(this.data.startTime.slice(3, 5)) + this.data.duration * 60) / 60)).padStart(2, '0')}:${this.data.startTime.slice(3, 5)}`,
         place: this.data.place,
         city: this.data.placeDetails.city,
         district: this.data.placeDetails.district,
