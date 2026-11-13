@@ -29,3 +29,4 @@
 .standalone-entry>view:nth-child(2) text:first-child { font-size: var(--type-card); font-weight: var(--weight-card); }
 .standalone-entry>view:nth-child(2) text:last-child { margin-top: 4rpx; color: var(--color-muted); font-size: var(--type-caption); }
 .quick-mark--danger { background: var(--color-danger-soft); color: var(--color-danger); }
+.emergency-float { position: fixed; z-index: 999; right: 24rpx; bottom: calc(150rpx + env(safe-area-inset-bottom)); min-width: 176rpx; height: 88rpx; margin: 0; padding: 0 20rpx; display: flex; align-items: center; justify-content: center; border: 2rpx solid #fff; border-radius: 999rpx; background: #c9384f; color: #fff; font-size: 26rpx; font-weight: 800; box-shadow: 0 10rpx 32rpx rgba(114,25,45,.3); }
