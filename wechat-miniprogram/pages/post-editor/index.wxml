@@ -32,13 +32,22 @@
     <view class="settings-card">
       <view class="price-row">
         <view class="price-field">
-          <text class="price-field__label">价格</text>
+          <text class="price-field__label">小时价格</text>
           <view class="price-field__input"><text class="price-field__currency">¥</text><input class="price-field__control" data-field="price" value="{{price}}" bindinput="onField" type="digit" placeholder="0" aria-label="每小时价格" /><text class="price-field__unit">元/小时</text></view>
         </view>
         <view class="price-field price-field--hours">
           <text class="price-field__label">起约</text>
           <picker range="{{minHourOptions}}" bindchange="onMinHours"><view class="price-field__picker"><text>{{minHours}}小时</text><view class="control-chevron control-chevron--down" aria-hidden="true"></view></view></picker>
         </view>
+      </view>
+      <view class="price-breakdown" aria-label="小时价格与预计实收明细">
+        <view wx:if="{{priceBreakdown}}" class="price-breakdown__rows">
+          <view class="price-breakdown__line"><text>你设置的小时价格</text><text class="price-breakdown__amount">¥{{priceBreakdown.gross}}/小时</text></view>
+          <view class="price-breakdown__line"><text>平台安全保障费用（5%）</text><text class="price-breakdown__amount">-¥{{priceBreakdown.fee}}/小时</text></view>
+          <view class="price-breakdown__line price-breakdown__line--net"><text>Coser预计实收</text><text class="price-breakdown__amount price-breakdown__amount--net">¥{{priceBreakdown.net}}/小时</text></view>
+        </view>
+        <text wx:else class="price-breakdown__empty">填写小时价格后，查看平台费用和预计实收</text>
+        <text class="price-breakdown__hint">实际费用按订单成交金额计算，以结算明细为准。</text>
       </view>
 
       <button class="setting-row" bindtap="choosePlace">

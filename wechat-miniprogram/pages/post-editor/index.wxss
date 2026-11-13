@@ -38,6 +38,14 @@ page { background: #f6f5f8; }
 .price-field__unit { color: var(--color-muted-soft); font-size: 22rpx; }
 .price-field__picker { min-height: 60rpx; margin-top: 6rpx; padding: 0 14rpx; display: flex; align-items: center; justify-content: space-between; gap: 12rpx; border: 2rpx solid var(--color-border); border-radius: 14rpx; background: var(--color-bg); color: var(--color-text); font-size: 27rpx; font-weight: 750; }
 .price-field__picker .control-chevron { width: 12rpx; height: 12rpx; }
+.price-breakdown { padding: 18rpx 26rpx 22rpx; border-top: 1rpx solid var(--color-border); background: var(--color-primary-soft); }
+.price-breakdown__rows { display: grid; gap: 12rpx; }
+.price-breakdown__line { display: flex; align-items: baseline; justify-content: space-between; gap: 18rpx; color: var(--color-muted); font-size: 23rpx; line-height: 1.4; }
+.price-breakdown__amount { flex: none; color: var(--color-text); font-variant-numeric: tabular-nums; text-align: right; }
+.price-breakdown__line--net { padding-top: 14rpx; border-top: 1rpx solid var(--color-border); color: var(--color-text); font-size: 27rpx; font-weight: 800; }
+.price-breakdown__amount--net { color: var(--color-primary-ink); font-size: 30rpx; }
+.price-breakdown__empty { display: block; color: var(--color-muted); font-size: 23rpx; }
+.price-breakdown__hint { display: block; margin-top: 13rpx; color: var(--color-muted); font-size: 21rpx; line-height: 1.4; }
 .setting-row { width: 100%; min-height: 116rpx; margin: 0; padding: 20rpx 26rpx; border: 0; border-top: 1rpx solid var(--color-border); border-radius: 0; background: #fff; display: flex; align-items: center; justify-content: space-between; gap: 20rpx; text-align: left; }
 .setting-row__copy { flex: 1; min-width: 0; }
 .setting-row__title { display: block; color: var(--color-text); font-size: var(--type-body); font-weight: var(--weight-card); }

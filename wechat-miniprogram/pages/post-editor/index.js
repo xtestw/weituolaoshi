@@ -1,5 +1,7 @@
 const { get, set } = require('../../utils/store')
 const { validateVenue } = require('../../utils/cities')
+const { guardBooking } = require('../../utils/eligibility')
+const { hourlyBreakdown } = require('../../utils/pricing')
 
 const defaultBoundaries = [
   { id: 'b1', text: '不接受肢体接触' },
@@ -22,6 +24,7 @@ Page({
     title: '',
     description: '',
     price: '',
+    priceBreakdown: null,
     minHours: 2,
     minHourOptions: [2, 3, 4, 5, 6],
     city: '上海',
@@ -56,6 +59,7 @@ Page({
       title: draft.title || '',
       description: draft.description || (blockText ? blockText.text : ''),
       price: String(draft.price || ''),
+      priceBreakdown: hourlyBreakdown(draft.price || ''),
       minHours: Number(draft.minHours || 2),
       city: coserCity || draft.city || '上海',
       district: draft.district || '',
@@ -68,7 +72,9 @@ Page({
     })
   },
   onField(event) {
-    this.setData({ [event.currentTarget.dataset.field]: event.detail.value, dirty: true })
+    const field = event.currentTarget.dataset.field
+    const value = event.detail.value
+    this.setData({ [field]: value, ...(field === 'price' ? { priceBreakdown: hourlyBreakdown(value) } : {}), dirty: true })
   },
   onMinHours(event) {
     this.setData({ minHours: this.data.minHourOptions[event.detail.value], dirty: true })
@@ -163,10 +169,12 @@ Page({
   },
   saveDraft() { this.persist('draft', '已保存草稿') },
   publish() {
+    if (!guardBooking()) return
+    if (get('coserVerification', {}).status !== 'verified') return wx.showModal({ title: '请先完成Coser认证', content: '认证通过后才能发布服务帖子。', showCancel: false })
     if (!this.data.images.length) return wx.showToast({ title: '请至少添加一张照片', icon: 'none' })
     if (!this.data.title.trim()) return wx.showToast({ title: '请填写帖子标题', icon: 'none' })
     if (!this.data.description.trim()) return wx.showToast({ title: '请填写帖子正文', icon: 'none' })
-    if (!Number(this.data.price)) return wx.showToast({ title: '请填写每小时价格', icon: 'none' })
+    if (!hourlyBreakdown(this.data.price)) return wx.showToast({ title: '请填写有效的小时价格，最多两位小数', icon: 'none' })
     if (!this.data.placeDetails || !validateVenue(this.data.placeDetails, this.data.city).valid) return wx.showToast({ title: '请选择开放城区内的公共场所', icon: 'none' })
     this.persist('review', '已提交审核')
   },
