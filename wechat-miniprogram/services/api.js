@@ -30,6 +30,12 @@ function verifyIdentity(payload) {
 }
 
 function wechatLogin() {
+  if (app().globalData.localDevMode) {
+    return request('/v1/dev/login', { method: 'POST' }).then(({ token, user }) => {
+      wx.setStorageSync('account_token', token)
+      return user
+    })
+  }
   return new Promise((resolve, reject) => wx.login({ success: resolve, fail: reject }))
     .then(({ code }) => request('/v1/auth/wechat-login', { method: 'POST', data: { code } }))
     .then(({ token, user }) => { wx.setStorageSync('account_token', token); return user })

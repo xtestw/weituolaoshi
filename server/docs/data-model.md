@@ -1,4 +1,6 @@
-# V1 数据模型
+# V1 数据模型（历史说明）
+
+新增的 MySQL v4 资料与 V6 兼容迁移，请参阅 [v4-schema-integration.md](v4-schema-integration.md)。
 
 迁移脚本位于 `src/main/resources/db/migration`。金额一律使用人民币分和 `BIGINT`；预约时间按 `Asia/Shanghai` 解释。
 

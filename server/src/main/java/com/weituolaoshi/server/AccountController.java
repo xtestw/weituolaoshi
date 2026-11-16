@@ -36,7 +36,7 @@ public class AccountController {
             throw new ApiException(HttpStatus.UNAUTHORIZED, "请先登录");
         String token = authorization.substring(7);
         if (token.isBlank()) throw new ApiException(HttpStatus.UNAUTHORIZED, "请先登录");
-        List<String> users = db.queryForList("SELECT user_id FROM user_session WHERE token_hash = ? AND expires_at > CURRENT_TIMESTAMP", String.class, hash(token));
+        List<String> users = db.queryForList("SELECT s.user_id FROM user_session s JOIN app_user u ON u.id=s.user_id WHERE s.token_hash = ? AND s.expires_at > CURRENT_TIMESTAMP AND u.account_status='active'", String.class, hash(token));
         if (users.isEmpty()) throw new ApiException(HttpStatus.UNAUTHORIZED, "登录已过期");
         return users.get(0);
     }
@@ -62,7 +62,12 @@ public class AccountController {
         if (openid == null || openid.isBlank()) throw new ApiException(HttpStatus.UNAUTHORIZED, "微信登录凭证无效");
         List<String> users = db.queryForList("SELECT id FROM app_user WHERE wechat_openid = ?", String.class, openid);
         String id = users.isEmpty() ? "usr-" + UUID.randomUUID() : users.get(0);
-        if (users.isEmpty()) db.update("INSERT INTO app_user(id, wechat_openid, nickname, role) VALUES (?, ?, '微信用户', 'customer')", id, openid);
+        if (users.isEmpty()) db.update("INSERT INTO app_user(id, wechat_openid, identity_provider, identity_subject, nickname, role, last_login_at) VALUES (?, ?, 'wechat', ?, '微信用户', 'customer', CURRENT_TIMESTAMP)", id, openid, openid);
+        else {
+            String status = db.queryForObject("SELECT account_status FROM app_user WHERE id=?", String.class, id);
+            if (!"active".equals(status)) throw new ApiException(HttpStatus.FORBIDDEN, "账号不可登录");
+            db.update("UPDATE app_user SET identity_subject=COALESCE(identity_subject,?),last_login_at=CURRENT_TIMESTAMP WHERE id=?", openid, id);
+        }
         String token = UUID.randomUUID().toString() + UUID.randomUUID();
         db.update("INSERT INTO user_session(token_hash, user_id, expires_at) VALUES (?, ?, ?)", hash(token), id,
             java.sql.Timestamp.valueOf(LocalDateTime.now().plusDays(30)));

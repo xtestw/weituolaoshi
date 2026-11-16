@@ -1,7 +1,6 @@
-const { services } = require('../../utils/services')
+const { services, loadCatalog } = require('../../utils/services')
 const { CITIES } = require('../../utils/cities')
 const { get, set } = require('../../utils/store')
-const { isBookableDay } = require('../../utils/availability')
 
 function buildCalendarDays() {
   const now = new Date()
@@ -28,7 +27,6 @@ Page({
     activeFeed: 'recommend',
     dateLabel: '日历可约',
     calendarOpen: false,
-    calendarSelected: false,
     calendarWeekdays: ['一', '二', '三', '四', '五', '六', '日'],
     calendarDays: buildCalendarDays(),
     calendarMonthLabel: `${new Date().getFullYear()}年${new Date().getMonth() + 1}月`,
@@ -48,6 +46,7 @@ Page({
     if (typeof this.getTabBar === 'function' && this.getTabBar()) this.getTabBar().setData({ selected: 0, hidden: false })
     const city = get('currentCity', '上海')
     if (city !== this.data.city) this.setData({ city }, () => this.applyFeed(this.data.activeFeed))
+    loadCatalog().then(() => this.applyFeed(this.data.activeFeed)).catch(() => this.setData({ catalogError: true }))
     this.showWomenOnlyNotice()
   },
   showWomenOnlyNotice() {
@@ -59,7 +58,7 @@ Page({
     const key = `coser_v1_women_notice_${did}`
     if (wx.getStorageSync(key)) return
     wx.setStorageSync(key, true)
-    wx.showModal({ title: '欢迎来到全女平台', content: '这里是全女委托社区。你可以自由浏览；下单和发布前，我们会核验女性身份及成年状态。（占位文案，后续调整）', showCancel: false, confirmText: '我知道了' })
+    wx.showModal({ title: '欢迎来到全女平台', content: '这里是全女委托社区。你可以自由浏览；下单和发布前，我们会核验女性身份及成年状态。', showCancel: false, confirmText: '我知道了' })
   },
   selectCity() {
     this.setData({ cityPickerOpen: true })
@@ -92,19 +91,12 @@ Page({
   },
   applyFeed(key) {
     const groups = {
-      following: [services[0], services[3]],
-      recommend: [services[0], services[2], services[4], services[3]],
-      calendar: services.filter((item) => {
-        if (item.gender !== '女') return false
-        if (!this.data.calendarSelected) return item.available
-        const { calendarStart, calendarEnd, calendarMonthNumber } = this.data
-        const year = new Date().getFullYear()
-        const keys = Array.from({ length: calendarEnd - calendarStart + 1 }, (_, offset) => `${year}-${String(calendarMonthNumber).padStart(2, '0')}-${String(calendarStart + offset).padStart(2, '0')}`)
-        return keys.some((key) => isBookableDay(item, key))
-      }),
-      topic: [services[2], services[4], services[1]]
+      following: [],
+      recommend: services,
+      calendar: services.filter((item) => item.available),
+      topic: services
     }
-    const items = (groups[key] || groups.recommend).filter((item) => (item.city || '上海') === this.data.city)
+    const items = (groups[key] || groups.recommend).filter((item) => item && (item.city || '上海') === this.data.city)
     this.setData({ activeFeed: key, left: items.filter((_, index) => index % 2 === 0), right: items.filter((_, index) => index % 2 === 1) })
   },
   closeCalendar() {
@@ -134,11 +126,8 @@ Page({
     }
     const monthText = String(this.data.calendarMonthNumber).padStart(2, '0')
     const label = `${monthText}.${String(calendarStart).padStart(2, '0')}-${monthText}.${String(calendarEnd).padStart(2, '0')}可约`
-    const year = new Date().getFullYear()
-    const month = this.data.calendarMonthNumber
-    const keys = Array.from({ length: calendarEnd - calendarStart + 1 }, (_, offset) => `${year}-${String(month).padStart(2, '0')}-${String(calendarStart + offset).padStart(2, '0')}`)
-    const items = services.filter((item) => item.gender === '女' && (item.city || '上海') === this.data.city && keys.some((key) => isBookableDay(item, key)))
-    this.setData({ calendarOpen: false, calendarSelected: true, activeFeed: 'calendar', dateLabel: label, 'feeds[2].label': label, left: items.filter((_, index) => index % 2 === 0), right: items.filter((_, index) => index % 2 === 1) })
+    const items = services.filter((item) => item.available && (item.city || '上海') === this.data.city)
+    this.setData({ calendarOpen: false, activeFeed: 'calendar', dateLabel: label, 'feeds[2].label': label, left: items.filter((_, index) => index % 2 === 0), right: items.filter((_, index) => index % 2 === 1) })
     if (typeof this.getTabBar === 'function' && this.getTabBar()) this.getTabBar().setData({ hidden: false })
   },
   openService(event) { wx.navigateTo({ url: `/pages/coser/index?id=${event.detail.id}` }) },

@@ -4,6 +4,7 @@ import java.sql.Timestamp;
 import java.time.*;
 import java.util.*;
 import org.springframework.http.HttpStatus;
+import org.springframework.core.env.Environment;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
@@ -12,7 +13,9 @@ import org.springframework.web.bind.annotation.*;
 @RequestMapping("/v1")
 public class MarketplaceController {
     private final JdbcTemplate db;
-    public MarketplaceController(JdbcTemplate db) { this.db = db; }
+    private final AuthSupport auth;
+    private final Environment environment;
+    public MarketplaceController(JdbcTemplate db, AuthSupport auth, Environment environment) { this.db = db; this.auth = auth; this.environment = environment; }
 
     private String required(Map<String, Object> body, String key) {
         Object value = body.get(key);
@@ -28,10 +31,15 @@ public class MarketplaceController {
         return ((Number) value).intValue();
     }
 
+    private String actor(String bearer, String demo) {
+        if (bearer != null && !bearer.isBlank()) return auth.user(bearer);
+        if (Arrays.asList(environment.getActiveProfiles()).contains("local") && demo != null && demo.startsWith("demo-")) return demo;
+        throw new ApiException(HttpStatus.UNAUTHORIZED, "请先登录");
+    }
+
     private void role(String user, String expected) {
-        List<String> roles = db.queryForList("SELECT role FROM app_user WHERE id = ?", String.class, user);
-        if (!user.startsWith("demo-") || roles.isEmpty() || !expected.equals(roles.get(0)))
-            throw new ApiException(HttpStatus.FORBIDDEN, "仅允许匹配角色的本地演示用户");
+        List<String> roles = db.queryForList("SELECT role FROM app_user WHERE id=? AND account_status='active'", String.class, user);
+        if (roles.isEmpty() || !expected.equals(roles.get(0))) throw new ApiException(HttpStatus.FORBIDDEN, "当前账号无权操作");
     }
 
     private Map<String, Object> service(String id) {
@@ -45,14 +53,41 @@ public class MarketplaceController {
     @GetMapping("/services")
     public List<Map<String, Object>> services() {
         return db.queryForList("SELECT s.id, s.title, c.display_name AS coser, s.city, " +
-            "s.price_per_hour AS \"pricePerHour\", s.min_hours AS \"minHours\" FROM service_post s " +
-            "JOIN coser_profile c ON c.user_id = s.coser_id WHERE s.status = 'published' ORDER BY s.created_at DESC");
+            "s.price_per_hour AS \"pricePerHour\", s.min_hours AS \"minHours\", s.max_hours AS \"maxHours\", " +
+            "s.cover_url AS \"coverUrl\", s.ip_name_snapshot AS \"ipName\", s.character_name_snapshot AS \"characterName\", " +
+            "s.service_mode AS \"serviceMode\", " +
+            "CASE WHEN c.verification_status='verified' THEN TRUE ELSE FALSE END AS verified, " +
+            "CASE WHEN EXISTS (SELECT 1 FROM availability_slot a WHERE a.coser_id=s.coser_id AND a.status='open' AND a.end_at>?) THEN TRUE ELSE FALSE END AS available FROM service_post s " +
+            "JOIN coser_profile c ON c.user_id = s.coser_id JOIN app_user u ON u.id=s.coser_id " +
+            "WHERE s.status = 'published' AND c.service_status='active' AND u.account_status='active' " +
+            "AND s.content_kind = 'commission' AND s.visibility = 'public' AND s.audit_status = 'approved' " +
+            "AND s.deleted_at IS NULL ORDER BY s.created_at DESC", Timestamp.valueOf(LocalDateTime.now(ZoneId.of("Asia/Shanghai")).plusHours(24)));
+    }
+
+    @GetMapping("/services/{id}")
+    public Map<String, Object> serviceDetail(@PathVariable String id) {
+        List<Map<String, Object>> rows = db.queryForList("SELECT s.id, s.title, s.description, s.city, s.price_per_hour AS \"pricePerHour\", " +
+            "s.min_hours AS \"minHours\", s.max_hours AS \"maxHours\", s.service_terms AS \"serviceTerms\", " +
+            "s.cover_url AS \"coverUrl\", s.ip_name_snapshot AS \"ipName\", s.character_name_snapshot AS \"characterName\", " +
+            "s.service_mode AS \"serviceMode\", c.display_name AS coser, " +
+            "CASE WHEN c.verification_status='verified' THEN TRUE ELSE FALSE END AS verified FROM service_post s " +
+            "JOIN coser_profile c ON c.user_id=s.coser_id JOIN app_user u ON u.id=s.coser_id " +
+            "WHERE s.id=? AND s.status='published' AND c.service_status='active' AND u.account_status='active' " +
+            "AND s.content_kind='commission' AND s.visibility='public' AND s.audit_status='approved' AND s.deleted_at IS NULL", id);
+        if (rows.isEmpty()) throw new ApiException(HttpStatus.NOT_FOUND, "服务不存在");
+        Map<String, Object> result = new HashMap<>(rows.get(0));
+        result.put("boundaries", db.queryForList("SELECT text FROM service_boundary WHERE service_id=? ORDER BY sort_order", String.class, id));
+        result.put("media", db.queryForList("SELECT media_type AS \"type\",media_url AS \"url\",thumbnail_url AS \"thumbnailUrl\" " +
+            "FROM service_media WHERE service_id=? AND deleted_at IS NULL AND processing_status='ready' AND audit_status='approved' ORDER BY sort_order", id));
+        return result;
     }
 
     @PostMapping("/services")
     @Transactional
-    public Map<String, Object> createService(@RequestHeader("X-Demo-User") String user,
+    public Map<String, Object> createService(@RequestHeader(value="Authorization",required=false) String bearer,
+            @RequestHeader(value="X-Demo-User",required=false) String demo,
             @RequestBody Map<String, Object> body) {
+        String user=actor(bearer,demo);
         role(user, "coser");
         int price = integer(body, "pricePerHour");
         int minHours = integer(body, "minHours");
@@ -69,15 +104,27 @@ public class MarketplaceController {
     public Map<String, Object> availability(@PathVariable String id) {
         Map<String, Object> svc = service(id);
         List<Map<String, Object>> slots = db.queryForList("SELECT id, start_at AS \"startAt\", end_at AS \"endAt\" " +
-            "FROM availability_slot WHERE coser_id = ? AND status = 'open' AND end_at > CURRENT_TIMESTAMP ORDER BY start_at",
-            svc.get("coser_id"));
+            "FROM availability_slot WHERE coser_id = ? AND status = 'open' AND end_at > ? ORDER BY start_at",
+            svc.get("coser_id"), Timestamp.valueOf(LocalDateTime.now(ZoneId.of("Asia/Shanghai")).plusHours(24)));
+        for (Map<String,Object> slot : slots) {
+            slot.put("startAt", ((Timestamp)slot.get("startAt")).toLocalDateTime().toString());
+            slot.put("endAt", ((Timestamp)slot.get("endAt")).toLocalDateTime().toString());
+        }
         return Map.of("serviceId", id, "slots", slots);
+    }
+
+    @GetMapping("/venues")
+    public List<Map<String,Object>> venues(@RequestParam String city) {
+        return db.queryForList("SELECT id,name,city,district,address,category FROM venue WHERE city=? AND review_status='approved' " +
+            "AND category IN ('exhibition','museum','mall','cafe','park') ORDER BY name",city);
     }
 
     @PostMapping("/orders/quote")
     @Transactional
-    public Map<String, Object> quote(@RequestHeader("X-Demo-User") String user,
+    public Map<String, Object> quote(@RequestHeader(value="Authorization",required=false) String bearer,
+            @RequestHeader(value="X-Demo-User",required=false) String demo,
             @RequestBody Map<String, Object> body) {
+        String user=actor(bearer,demo);
         role(user, "customer");
         Map<String, Object> svc = service(required(body, "serviceId"));
         if (!"published".equals(svc.get("status")) || !Boolean.TRUE.equals(svc.get("deposit_qualified")))
@@ -90,34 +137,36 @@ public class MarketplaceController {
         catch (Exception ex) { throw new ApiException(HttpStatus.BAD_REQUEST, "startAt格式应为2026-11-16T14:00:00"); }
         LocalDateTime end = start.plusHours(hours);
         if (!start.toLocalDate().equals(end.toLocalDate()) || start.getHour() < 10 || end.getHour() > 22 ||
-                start.getMinute() != 0 || start.isBefore(LocalDateTime.now(ZoneId.of("Asia/Shanghai"))))
-            throw new ApiException(HttpStatus.BAD_REQUEST, "只接受上海时间10:00至22:00内的非过夜整点时段");
+                start.getMinute() != 0 || start.isBefore(LocalDateTime.now(ZoneId.of("Asia/Shanghai")).plusHours(24)))
+            throw new ApiException(HttpStatus.BAD_REQUEST, "需至少提前24小时预约上海时间10:00至22:00内的非过夜整点时段");
         long amount = Math.multiplyExact(((Number) svc.get("price_per_hour")).longValue(), hours);
         String id = "qt-" + UUID.randomUUID();
-        LocalDateTime expiry = LocalDateTime.now(ZoneOffset.UTC).plusMinutes(10);
+        LocalDateTime expiry = LocalDateTime.now().plusMinutes(15);
         db.update("INSERT INTO price_quote(id, customer_id, service_id, start_at, end_at, service_amount, " +
             "customer_platform_fee, protection_fee, payable_amount, expires_at) VALUES (?, ?, ?, ?, ?, ?, 0, 0, ?, ?)",
             id, user, svc.get("id"), Timestamp.valueOf(start), Timestamp.valueOf(end), amount, amount, Timestamp.valueOf(expiry));
         return Map.of("quoteId", id, "serviceId", svc.get("id"), "serviceAmount", amount,
             "customerPlatformFee", 0, "protectionFee", 0, "payableAmount", amount,
-            "currency", "CNY", "expiresAt", expiry.toString() + "Z");
+            "currency", "CNY", "expiresAt", expiry.toString());
     }
 
     @PostMapping("/orders")
     @Transactional
-    public Object createOrder(@RequestHeader("X-Demo-User") String user, @RequestHeader("Idempotency-Key") String key,
+    public Object createOrder(@RequestHeader(value="Authorization",required=false) String bearer,
+            @RequestHeader(value="X-Demo-User",required=false) String demo,@RequestHeader("Idempotency-Key") String key,
             @RequestBody Map<String, Object> body) {
+        String user=actor(bearer,demo);
         role(user, "customer");
         if (key.isBlank()) throw new ApiException(HttpStatus.BAD_REQUEST, "Idempotency-Key不能为空");
         List<String> previous = db.queryForList("SELECT result_id FROM idempotency_record WHERE actor_id = ? " +
             "AND operation = 'create_order' AND request_key = ?", String.class, user, key);
-        if (!previous.isEmpty()) return order(previous.get(0), user);
+        if (!previous.isEmpty()) return orderForUser(previous.get(0), user);
         String quoteId = required(body, "quoteId");
         String venueId = required(body, "venueId");
         List<Map<String, Object>> quotes = db.queryForList("SELECT * FROM price_quote WHERE id = ? AND customer_id = ?", quoteId, user);
         if (quotes.isEmpty()) throw new ApiException(HttpStatus.NOT_FOUND, "报价不存在");
         Map<String, Object> quote = quotes.get(0);
-        if (((Timestamp) quote.get("expires_at")).toLocalDateTime().isBefore(LocalDateTime.now(ZoneOffset.UTC)))
+        if (((Timestamp) quote.get("expires_at")).toLocalDateTime().isBefore(LocalDateTime.now()))
             throw new ApiException(HttpStatus.CONFLICT, "报价已过期");
         Map<String, Object> svc = service((String) quote.get("service_id"));
         String coser = (String) svc.get("coser_id");
@@ -131,9 +180,9 @@ public class MarketplaceController {
             throw new ApiException(HttpStatus.FORBIDDEN, "双方下单资格不匹配");
         Timestamp start = (Timestamp) quote.get("start_at");
         Timestamp end = (Timestamp) quote.get("end_at");
-        Integer available = db.queryForObject("SELECT COUNT(*) FROM availability_slot WHERE coser_id = ? " +
-            "AND status = 'open' AND start_at <= ? AND end_at >= ?", Integer.class, coser, start, end);
-        if (available == null || available == 0) throw new ApiException(HttpStatus.CONFLICT, "档期不可约");
+        List<String> windows = db.queryForList("SELECT id FROM availability_slot WHERE coser_id=? AND status='open' " +
+            "AND start_at<=? AND end_at>=? ORDER BY id",String.class,coser,start,end);
+        if (windows.isEmpty()) throw new ApiException(HttpStatus.CONFLICT, "档期不可约");
         Integer conflicts = db.queryForObject("SELECT COUNT(*) FROM booking_order WHERE coser_id = ? " +
             "AND start_at < ? AND end_at > ? AND status NOT IN ('cancelled', 'refunded')", Integer.class, coser, end, start);
         if (conflicts != null && conflicts > 0) throw new ApiException(HttpStatus.CONFLICT, "档期已被其他订单占用");
@@ -141,34 +190,52 @@ public class MarketplaceController {
             "AND review_status = 'approved' AND category IN ('exhibition','museum','mall','cafe','park')", venueId);
         if (venues.isEmpty() || !Objects.equals(venues.get(0).get("city"), svc.get("city")))
             throw new ApiException(HttpStatus.BAD_REQUEST, "地点不是该城市允许的公共场所");
-        if (start.toLocalDateTime().isBefore(LocalDateTime.now(ZoneId.of("Asia/Shanghai")).plusHours(24))) {
-            Integer confirmed = db.queryForObject("SELECT COUNT(*) FROM time_confirmation t JOIN conversation c " +
-                "ON c.id = t.conversation_id WHERE c.customer_id = ? AND c.coser_id = ? " +
-                "AND t.start_at = ? AND t.end_at = ? AND t.expires_at > CURRENT_TIMESTAMP",
-                Integer.class, user, coser, start, end);
-            if (confirmed == null || confirmed == 0)
-                throw new ApiException(HttpStatus.CONFLICT, "24小时内预约需要Coser聊天确认时间");
-        }
+        if (start.toLocalDateTime().isBefore(LocalDateTime.now(ZoneId.of("Asia/Shanghai")).plusHours(24)))
+            throw new ApiException(HttpStatus.CONFLICT, "预约时间不足24小时");
+        Map<String,Object> policy=db.queryForMap("SELECT buffer_before_minutes,buffer_after_minutes,min_lead_minutes FROM coser_profile WHERE user_id=?",coser);
+        int before=((Number)policy.get("buffer_before_minutes")).intValue(),after=((Number)policy.get("buffer_after_minutes")).intValue();
+        Timestamp occupiedStart=Timestamp.valueOf(start.toLocalDateTime().minusMinutes(before));
+        Timestamp occupiedEnd=Timestamp.valueOf(end.toLocalDateTime().plusMinutes(after));
+        Integer overlaps=db.queryForObject("SELECT COUNT(*) FROM order_appointment WHERE coser_id=? AND occupied_start_at<? AND occupied_end_at>? " +
+            "AND (status IN ('confirmed','in_service') OR (status='held' AND hold_expires_at>CURRENT_TIMESTAMP) " +
+            "OR (status='awaiting_coser' AND confirm_expires_at>CURRENT_TIMESTAMP))",Integer.class,coser,occupiedEnd,occupiedStart);
+        if(overlaps!=null&&overlaps>0) throw new ApiException(HttpStatus.CONFLICT,"档期已被占用");
+        LocalDateTime paymentExpiry=LocalDateTime.now().plusMinutes(15);
+        if (!paymentExpiry.plusHours(2).isBefore(occupiedStart.toLocalDateTime())) throw new ApiException(HttpStatus.CONFLICT,"无法在服务开始前完成付款与确认");
         String id = "ord-" + UUID.randomUUID();
         db.update("INSERT INTO booking_order(id, customer_id, coser_id, service_id, quote_id, venue_id, " +
-            "start_at, end_at, payable_amount, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'awaiting_payment')",
-            id, user, coser, svc.get("id"), quoteId, venueId, start, end, quote.get("payable_amount"));
+            "start_at, end_at, payable_amount, status,request_key,service_title_snapshot,seller_name_snapshot,unit_price_cents," +
+            "duration_minutes,payment_expires_at,min_lead_minutes_snapshot) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'awaiting_payment',?,?,?,?,?,?,?)",
+            id, user, coser, svc.get("id"), quoteId, venueId, start, end, quote.get("payable_amount"),key,svc.get("title"),svc.get("coser"),
+            svc.get("price_per_hour"),java.time.Duration.between(start.toLocalDateTime(),end.toLocalDateTime()).toMinutes(),
+            Timestamp.valueOf(paymentExpiry),policy.get("min_lead_minutes"));
+        db.update("INSERT INTO order_appointment(id,order_id,coser_id,availability_id,service_start_at,service_end_at," +
+            "buffer_before_minutes,buffer_after_minutes,occupied_start_at,occupied_end_at,timezone_name,status,hold_expires_at) " +
+            "VALUES (?,?,?,?,?,?,?,?,?,?,?,'held',?)","apt-"+UUID.randomUUID(),id,coser,windows.get(0),start,end,before,after,
+            occupiedStart,occupiedEnd,"Asia/Shanghai",Timestamp.valueOf(paymentExpiry));
         db.update("INSERT INTO idempotency_record(actor_id, operation, request_key, result_id) VALUES (?, 'create_order', ?, ?)",
             user, key, id);
         db.update("INSERT INTO order_event(id, order_id, actor_id, action, to_status) VALUES (?, ?, ?, 'create', 'awaiting_payment')",
             "evt-" + UUID.randomUUID(), id, user);
-        return order(id, user);
+        return orderForUser(id, user);
     }
 
     @GetMapping("/orders")
-    public List<Map<String, Object>> orders(@RequestHeader("X-Demo-User") String user) {
+    public List<Map<String, Object>> orders(@RequestHeader(value="Authorization",required=false) String bearer,
+            @RequestHeader(value="X-Demo-User",required=false) String demo) {
+        String user=actor(bearer,demo);
         role(user, "customer");
         return db.queryForList("SELECT id, service_id AS \"serviceId\", status, payable_amount AS \"payableAmount\" " +
             "FROM booking_order WHERE customer_id = ? ORDER BY created_at DESC", user);
     }
 
     @GetMapping("/orders/{id}")
-    public Map<String, Object> order(@PathVariable String id, @RequestHeader("X-Demo-User") String user) {
+    public Map<String, Object> order(@PathVariable String id,@RequestHeader(value="Authorization",required=false) String bearer,
+            @RequestHeader(value="X-Demo-User",required=false) String demo) {
+        return orderForUser(id,actor(bearer,demo));
+    }
+
+    private Map<String, Object> orderForUser(String id,String user) {
         List<Map<String, Object>> rows = db.queryForList("SELECT * FROM booking_order WHERE id = ? AND " +
             "(customer_id = ? OR coser_id = ?)", id, user, user);
         if (rows.isEmpty()) throw new ApiException(HttpStatus.NOT_FOUND, "订单不存在");
@@ -176,8 +243,10 @@ public class MarketplaceController {
     }
 
     @GetMapping("/orders/{id}/events")
-    public List<Map<String, Object>> events(@PathVariable String id, @RequestHeader("X-Demo-User") String user) {
-        order(id, user);
+    public List<Map<String, Object>> events(@PathVariable String id,@RequestHeader(value="Authorization",required=false) String bearer,
+            @RequestHeader(value="X-Demo-User",required=false) String demo) {
+        String user=actor(bearer,demo);
+        orderForUser(id, user);
         return db.queryForList("SELECT action, from_status AS \"fromStatus\", to_status AS \"toStatus\", created_at AS \"createdAt\" " +
             "FROM order_event WHERE order_id = ? ORDER BY created_at", id);
     }

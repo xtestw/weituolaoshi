@@ -1,0 +1,6 @@
+server:
+  port: 18080
+  address: 127.0.0.1
+spring:
+  datasource:
+    url: jdbc:h2:file:./data/local-dev;MODE=PostgreSQL;DATABASE_TO_LOWER=TRUE

@@ -1,6 +1,6 @@
 const { get, set } = require('../../utils/store')
-const { services } = require('../../utils/services')
-const { nextDays } = require('../../utils/availability')
+const { services, mapService } = require('../../utils/services')
+const { request } = require('../../services/api')
 const { guardBooking } = require('../../utils/eligibility')
 
 Page({
@@ -11,10 +11,16 @@ Page({
     isSampleProfile: true,
     favorite: false,
     scheduleOpen: false,
-    selectedDate: '',
+    selectedDate: '11月16日 周一',
     selectedDateKey: '',
-    dates: [],
     reputation: { score: '—', scoredOrders: 0, incompleteCount: 0, sample: false },
+    dates: [
+      { label: '11/16', sub: '周一', full: '11月16日 周一', open: true },
+      { label: '11/17', sub: '周二', full: '11月17日 周二', open: true },
+      { label: '11/18', sub: '周三', full: '11月18日 周三', open: false },
+      { label: '11/21', sub: '周六', full: '11月21日 周六', open: true }
+    ],
+    hours: Array.from({ length: 24 }, (_, hour) => ({ label: String(hour).padStart(2, '0'), open: (hour >= 10 && hour < 12) || (hour >= 14 && hour < 18) || (hour >= 19 && hour < 22) })),
     boundaries: ['不接受肢体接触', '轻挽手臂', '不饮酒'],
     clothes: [
       { name: '三月七·巡猎', detail: '全套 · 含假发道具' },
@@ -26,18 +32,28 @@ Page({
   onLoad(options) {
     const serviceId = options.id || 'svc-1'
     const service = services.find((item) => item.id === serviceId) || services[0]
-    const dates = nextDays(service)
-    const firstOpen = dates.find((item) => item.open)
-    this.setData({ serviceId: service.id, service, dates, selectedDate: firstOpen ? firstOpen.full : '暂无可约日期', selectedDateKey: firstOpen ? firstOpen.key : '', avatar: service.coser.slice(-1), isSampleProfile: service.id === 'svc-1', favorite: get('favorites', []).includes(service.id) })
+    this.setData({ serviceId: service.id, service, avatar: service.coser.slice(-1), isSampleProfile: service.id === 'svc-1', favorite: get('favorites', []).includes(service.id) })
     this.refreshReputation()
+    request(`/v1/services/${encodeURIComponent(serviceId)}`).then(detail => {
+      const live = { ...mapService(detail), description: detail.description || '', serviceTerms: detail.serviceTerms || '', minHours: detail.minHours }
+      this.setData({ service: live, avatar: live.coser.slice(-1), isSampleProfile: false, boundaries: detail.boundaries || [] })
+    }).catch(() => {})
+    request(`/v1/cosers/${encodeURIComponent(serviceId)}/availability`).then(({ slots }) => {
+      const days = []
+      slots.forEach(slot => {
+        const date = String(slot.startAt).slice(0, 10)
+        if (!days.some(item => item.date === date)) days.push({ date, key: date, label: date.slice(5).replace('-', '/'), sub: '', full: date, open: true })
+      })
+      this.setData({ dates: days.slice(0, 14), selectedDate: days.length ? days[0].full : '暂无可约日期', selectedDateKey: days.length ? days[0].key : '' })
+    }).catch(() => {})
   },
   onShow() { if (this.data.serviceId) this.refreshReputation() },
   refreshReputation() {
     const service = this.data.service
     const coserId = service.id === 'svc-1' ? 'mine' : service.id
-    const reviews = Array.from(new Map(get('orderReviews', []).filter((item) => item.coserId === coserId && Number(item.score) >= 1 && Number(item.score) <= 5).map((item) => [item.orderId, item])).values())
+    const reviews = Array.from(new Map(get('orderReviews', []).filter(item => item.coserId === coserId && Number(item.score) >= 1 && Number(item.score) <= 5).map(item => [item.orderId, item])).values())
     const cases = get('responsibilityCases', [])
-    const incompleteCount = new Set(cases.filter((item) => item.coserId === coserId && item.status === 'approved' && item.decision === 'coser' && item.fulfillmentIncomplete).map((item) => item.orderId)).size
+    const incompleteCount = new Set(cases.filter(item => item.coserId === coserId && item.status === 'approved' && item.decision === 'coser' && item.fulfillmentIncomplete).map(item => item.orderId)).size
     this.setData({ reputation: { score: reviews.length ? (reviews.reduce((sum, item) => sum + Number(item.score), 0) / reviews.length).toFixed(1) : service.rating ? Number(service.rating).toFixed(1) : '—', scoredOrders: reviews.length, incompleteCount, sample: !reviews.length && !!service.rating } })
   },
   toggleFavorite() {
@@ -49,12 +65,12 @@ Page({
   },
   selectDate(event) {
     const item = this.data.dates[event.currentTarget.dataset.index]
-    if (!item.open) return wx.showToast({ title: '该日期不可约', icon: 'none' })
+    if (!item.open) return wx.showToast({ title: '当天暂无可约时间', icon: 'none' })
     this.setData({ selectedDate: item.full, selectedDateKey: item.key })
   },
   toggleSchedule() { this.setData({ scheduleOpen: !this.data.scheduleOpen }) },
   openChat() { wx.navigateTo({ url: `/pages/chat/index?name=${encodeURIComponent(this.data.service.coser)}` }) },
-  book() { if (guardBooking()) wx.navigateTo({ url: `/pages/booking/index?id=${this.data.serviceId}&date=${this.data.selectedDateKey}` }) },
+  book() { if (!this.data.dates.length) return wx.showToast({ title: '暂无可约时间', icon: 'none' }); if (!getApp().globalData.localDevMode && !guardBooking()) return; wx.navigateTo({ url: `/pages/booking/index?id=${this.data.serviceId}` }) },
   onShareAppMessage() {
     return { title: this.data.service.title, path: `/pages/coser/index?id=${this.data.serviceId}` }
   }

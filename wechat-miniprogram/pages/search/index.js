@@ -1,7 +1,6 @@
-const { services } = require('../../utils/services')
+const { services, loadCatalog } = require('../../utils/services')
 const { DISTRICTS, CITIES } = require('../../utils/cities')
 const { get } = require('../../utils/store')
-const { isBookableDay, nextDays } = require('../../utils/availability')
 
 const filterOptions = {
   time: ['全部时间', '今天可约', '本周可约', '周末可约'],
@@ -24,11 +23,12 @@ Page({
     filterSheetTitle: '',
     filterSheetOptions: [],
     filterSheetSelected: '',
-    results: services.filter((item) => item.gender === '女')
+    results: services
   },
   onLoad(options) {
     const city = CITIES.includes(options.city) ? options.city : get('currentCity', '上海')
     this.setData({ keyword: decodeURIComponent(options.q || ''), city }, this.applyFilters)
+    loadCatalog().then(() => this.applyFilters()).catch(() => this.setData({ catalogError: true }))
   },
   onKeyword(event) { this.setData({ keyword: event.detail.value }) },
   submit() { this.applyFilters() },
@@ -51,16 +51,7 @@ Page({
     const selected = Object.fromEntries(this.data.filters.map((item) => [item.key, item.value]))
     const keyword = this.data.keyword.trim().toLowerCase()
     let results = services.filter((item) => (item.city || '上海') === this.data.city && (!keyword || `${item.title}${item.coser}${item.district}`.toLowerCase().includes(keyword)))
-    if (selected.time && selected.time !== '全部时间') {
-      const upcoming = nextDays({ available: true }, 7)
-      const today = new Date()
-      const daysLeftInWeek = 7 - ((today.getDay() + 6) % 7)
-      const keys = selected.time === '今天可约' ? upcoming.slice(0, 1).map((day) => day.key)
-        : selected.time === '周末可约' ? upcoming.slice(0, daysLeftInWeek).filter((day) => /周[六日]/.test(day.sub)).map((day) => day.key)
-          : upcoming.slice(0, daysLeftInWeek).map((day) => day.key)
-      results = results.filter((item) => keys.some((key) => isBookableDay(item, key)))
-    }
-    results = results.filter((item) => item.gender === '女')
+    if (selected.time && selected.time !== '全部时间') results = results.filter((item) => item.available)
     if (selected.price === '¥150以下') results = results.filter((item) => item.price < 150)
     if (selected.price === '¥150–200') results = results.filter((item) => item.price >= 150 && item.price <= 200)
     if (selected.price === '¥200以上') results = results.filter((item) => item.price > 200)

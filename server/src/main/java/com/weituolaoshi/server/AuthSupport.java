@@ -24,7 +24,7 @@ public class AuthSupport {
         return header.substring(7);
     }
     public String user(String header) {
-        List<String> ids = db.queryForList("SELECT user_id FROM user_session WHERE token_hash=? AND expires_at>CURRENT_TIMESTAMP", String.class, hash(token(header)));
+        List<String> ids = db.queryForList("SELECT s.user_id FROM user_session s JOIN app_user u ON u.id=s.user_id WHERE s.token_hash=? AND s.expires_at>CURRENT_TIMESTAMP AND u.account_status='active'", String.class, hash(token(header)));
         if (ids.isEmpty()) throw new ApiException(HttpStatus.UNAUTHORIZED, "登录已过期");
         return ids.get(0);
     }

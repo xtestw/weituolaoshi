@@ -1,6 +1,6 @@
 # 次元委托 Java 服务端
 
-Java 11、Spring Boot 2.7、JDBC、H2 文件数据库和 Flyway 迁移。启动时自动建立 `server/data/weituolaoshi.mv.db` 并执行 `V1` 建表、`V2` 演示数据迁移；不需要预先安装数据库。数据模型见 `docs/data-model.md`。
+Java 11、Spring Boot 2.7、JDBC、H2 文件数据库和 Flyway 迁移。启动时自动建立 `server/data/weituolaoshi.mv.db` 并执行迁移；不需要预先安装数据库。数据模型见 `docs/data-model.md`，新增的 MySQL v4 资料与 V6 迁移对应关系见 `docs/v4-schema-integration.md`。
 
 ## 运行
 

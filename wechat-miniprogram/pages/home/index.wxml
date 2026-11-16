@@ -44,6 +44,7 @@
 </view>
 
 <view class="page home-page">
+  <view wx:if="{{catalogError}}" class="empty">网络暂不可用，正在展示示例内容</view>
   <scroll-view class="feed-tabs" scroll-x enhanced show-scrollbar="false">
     <button wx:for="{{feeds}}" wx:key="key" class="feed-tab {{activeFeed === item.key ? 'feed-tab--active' : ''}} {{item.key === 'calendar' && calendarOpen ? 'feed-tab--open' : ''}}" data-key="{{item.key}}" bindtap="selectFeed" aria-selected="{{activeFeed === item.key}}">{{item.label}}</button>
   </scroll-view>
