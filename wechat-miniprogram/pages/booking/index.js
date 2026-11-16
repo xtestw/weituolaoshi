@@ -97,7 +97,7 @@ Page({
     if (!getApp().globalData.localDevMode && !guardBooking()) return
     const errors = {}
     if (!this.data.isAvailable) return wx.showToast({ title: '所选时段不可约', icon: 'none' })
-    if (!wx.getStorageSync('account_token')) return wx.showToast({ title: '请先登录', icon: 'none' })
+    if (!wx.getStorageSync('account_token')) return wx.showModal({ title: '请先登录', content: '使用微信登录后即可提交委托。', confirmText: '去登录', success: ({ confirm }) => { if (confirm) wx.switchTab({ url: '/pages/profile/index' }) } })
     const boundaries = this.data.boundaries.map((item) => ({ ...item, invalid: !item.confirmed }))
     if (!this.data.placeDetails || !this.data.venues.some(item => item.id === this.data.placeDetails.id)) errors.place = '请选择平台核准的公共场所'
     if (!this.data.nickname.trim()) errors.nickname = '请告诉Coser如何称呼你'

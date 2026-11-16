@@ -67,9 +67,11 @@ public class AdminController {
         if(changed==0) throw new ApiException(HttpStatus.CONFLICT,"该申请不存在或已审核");
         String userId=db.queryForObject("SELECT user_id FROM identity_verification WHERE id=?",String.class,id);
         if(decision.equals("verified")) {
+            String gender=db.queryForObject("SELECT legal_gender FROM identity_verification WHERE id=?",String.class,id);
+            if(!"F".equals(gender)) throw new ApiException(HttpStatus.FORBIDDEN,"仅女性可成为Coser");
             db.update("UPDATE app_user SET role='coser' WHERE id=?",userId);
             Integer existing=db.queryForObject("SELECT COUNT(*) FROM coser_profile WHERE user_id=?",Integer.class,userId);
-            if(existing==null||existing==0) db.update("INSERT INTO coser_profile(user_id,display_name,city,deposit_qualified,verification_status,service_status) SELECT id,COALESCE(nickname,'微信用户'),'',FALSE,'verified','active' FROM app_user WHERE id=?",userId);
+            if(existing==null||existing==0) db.update("INSERT INTO coser_profile(user_id,display_name,city,verification_status,service_status) SELECT id,COALESCE(nickname,'微信用户'),'','verified','active' FROM app_user WHERE id=?",userId);
             else db.update("UPDATE coser_profile SET verification_status='verified',service_status='active' WHERE user_id=?",userId);
         } else db.update("UPDATE coser_profile SET verification_status='rejected',service_status='inactive' WHERE user_id=?",userId);
         audit(actor,"identity.review",id,decision+" "+reason);

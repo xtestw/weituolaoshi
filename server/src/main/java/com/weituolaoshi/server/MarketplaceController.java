@@ -44,10 +44,44 @@ public class MarketplaceController {
 
     private Map<String, Object> service(String id) {
         List<Map<String, Object>> rows = db.queryForList("SELECT s.id, s.coser_id, c.display_name AS coser, s.title, " +
-            "s.city, s.price_per_hour, s.min_hours, s.status, c.deposit_qualified FROM service_post s " +
+            "s.city, s.price_per_hour, s.min_hours, s.status, s.audit_status, s.visibility, s.deleted_at, " +
+            "c.verification_status, c.service_status FROM service_post s " +
             "JOIN coser_profile c ON c.user_id = s.coser_id WHERE s.id = ?", id);
         if (rows.isEmpty()) throw new ApiException(HttpStatus.NOT_FOUND, "服务不存在");
         return rows.get(0);
+    }
+
+    private void requireTradable(Map<String, Object> svc) {
+        if (!"published".equals(svc.get("status")) || !"approved".equals(svc.get("audit_status")) ||
+                !"public".equals(svc.get("visibility")) || svc.get("deleted_at") != null ||
+                !"verified".equals(svc.get("verification_status")) || !"active".equals(svc.get("service_status")))
+            throw new ApiException(HttpStatus.CONFLICT, "服务不可交易");
+    }
+
+    private void requireFemaleAdults(String customer, String coser) {
+        Integer eligible = db.queryForObject("SELECT COUNT(*) FROM identity_verification WHERE user_id IN (?, ?) " +
+            "AND status='verified' AND adult=TRUE AND legal_gender='F'", Integer.class, customer, coser);
+        if (eligible == null || eligible != 2)
+            throw new ApiException(HttpStatus.FORBIDDEN, "仅已完成实名核验的成年女性可下单和接单");
+    }
+
+    private void requireFemaleAdult(String user) {
+        Integer eligible = db.queryForObject("SELECT COUNT(*) FROM identity_verification WHERE user_id=? " +
+            "AND status='verified' AND adult=TRUE AND legal_gender='F'", Integer.class, user);
+        if (eligible == null || eligible != 1)
+            throw new ApiException(HttpStatus.FORBIDDEN, "仅已完成实名核验的成年女性可发布服务");
+    }
+
+    private void requireShortNoticeConfirmation(String customer, Map<String, Object> svc,
+            Timestamp start, Timestamp end) {
+        if (!start.toLocalDateTime().isBefore(LocalDateTime.now(ZoneId.of("Asia/Shanghai")).plusHours(24))) return;
+        Integer confirmed = db.queryForObject("SELECT COUNT(*) FROM time_confirmation t " +
+            "JOIN conversation c ON c.id=t.conversation_id WHERE c.customer_id=? AND c.coser_id=? " +
+            "AND c.service_id=? AND t.coser_id=? AND t.start_at=? AND t.end_at=? " +
+            "AND t.expires_at>CURRENT_TIMESTAMP", Integer.class, customer, svc.get("coser_id"),
+            svc.get("id"), svc.get("coser_id"), start, end);
+        if (confirmed == null || confirmed == 0)
+            throw new ApiException(HttpStatus.CONFLICT, "24小时内预约须先在聊天中由Coser确认所选时间");
     }
 
     @GetMapping("/services")
@@ -59,9 +93,11 @@ public class MarketplaceController {
             "CASE WHEN c.verification_status='verified' THEN TRUE ELSE FALSE END AS verified, " +
             "CASE WHEN EXISTS (SELECT 1 FROM availability_slot a WHERE a.coser_id=s.coser_id AND a.status='open' AND a.end_at>?) THEN TRUE ELSE FALSE END AS available FROM service_post s " +
             "JOIN coser_profile c ON c.user_id = s.coser_id JOIN app_user u ON u.id=s.coser_id " +
-            "WHERE s.status = 'published' AND c.service_status='active' AND u.account_status='active' " +
+            "WHERE s.status = 'published' AND c.verification_status='verified' AND c.service_status='active' AND u.account_status='active' " +
+            "AND EXISTS (SELECT 1 FROM identity_verification v WHERE v.user_id=s.coser_id " +
+            "AND v.status='verified' AND v.adult=TRUE AND v.legal_gender='F') " +
             "AND s.content_kind = 'commission' AND s.visibility = 'public' AND s.audit_status = 'approved' " +
-            "AND s.deleted_at IS NULL ORDER BY s.created_at DESC", Timestamp.valueOf(LocalDateTime.now(ZoneId.of("Asia/Shanghai")).plusHours(24)));
+            "AND s.deleted_at IS NULL ORDER BY s.created_at DESC", Timestamp.valueOf(LocalDateTime.now(ZoneId.of("Asia/Shanghai"))));
     }
 
     @GetMapping("/services/{id}")
@@ -73,7 +109,9 @@ public class MarketplaceController {
             "CASE WHEN c.verification_status='verified' THEN TRUE ELSE FALSE END AS verified FROM service_post s " +
             "JOIN coser_profile c ON c.user_id=s.coser_id JOIN app_user u ON u.id=s.coser_id " +
             "WHERE s.id=? AND s.status='published' AND c.service_status='active' AND u.account_status='active' " +
-            "AND s.content_kind='commission' AND s.visibility='public' AND s.audit_status='approved' AND s.deleted_at IS NULL", id);
+            "AND s.content_kind='commission' AND s.visibility='public' AND s.audit_status='approved' AND s.deleted_at IS NULL " +
+            "AND EXISTS (SELECT 1 FROM identity_verification v WHERE v.user_id=s.coser_id " +
+            "AND v.status='verified' AND v.adult=TRUE AND v.legal_gender='F')", id);
         if (rows.isEmpty()) throw new ApiException(HttpStatus.NOT_FOUND, "服务不存在");
         Map<String, Object> result = new HashMap<>(rows.get(0));
         result.put("boundaries", db.queryForList("SELECT text FROM service_boundary WHERE service_id=? ORDER BY sort_order", String.class, id));
@@ -89,6 +127,7 @@ public class MarketplaceController {
             @RequestBody Map<String, Object> body) {
         String user=actor(bearer,demo);
         role(user, "coser");
+        requireFemaleAdult(user);
         int price = integer(body, "pricePerHour");
         int minHours = integer(body, "minHours");
         if (price <= 0 || minHours < 2 || minHours > 8)
@@ -105,7 +144,7 @@ public class MarketplaceController {
         Map<String, Object> svc = service(id);
         List<Map<String, Object>> slots = db.queryForList("SELECT id, start_at AS \"startAt\", end_at AS \"endAt\" " +
             "FROM availability_slot WHERE coser_id = ? AND status = 'open' AND end_at > ? ORDER BY start_at",
-            svc.get("coser_id"), Timestamp.valueOf(LocalDateTime.now(ZoneId.of("Asia/Shanghai")).plusHours(24)));
+            svc.get("coser_id"), Timestamp.valueOf(LocalDateTime.now(ZoneId.of("Asia/Shanghai"))));
         for (Map<String,Object> slot : slots) {
             slot.put("startAt", ((Timestamp)slot.get("startAt")).toLocalDateTime().toString());
             slot.put("endAt", ((Timestamp)slot.get("endAt")).toLocalDateTime().toString());
@@ -125,10 +164,9 @@ public class MarketplaceController {
             @RequestHeader(value="X-Demo-User",required=false) String demo,
             @RequestBody Map<String, Object> body) {
         String user=actor(bearer,demo);
-        role(user, "customer");
         Map<String, Object> svc = service(required(body, "serviceId"));
-        if (!"published".equals(svc.get("status")) || !Boolean.TRUE.equals(svc.get("deposit_qualified")))
-            throw new ApiException(HttpStatus.CONFLICT, "服务不可交易");
+        requireTradable(svc);
+        requireFemaleAdults(user, (String) svc.get("coser_id"));
         int hours = integer(body, "durationHours");
         if (hours < ((Number) svc.get("min_hours")).intValue() || hours > 8)
             throw new ApiException(HttpStatus.BAD_REQUEST, "预约时长不符合要求");
@@ -136,9 +174,11 @@ public class MarketplaceController {
         try { start = LocalDateTime.parse(required(body, "startAt")); }
         catch (Exception ex) { throw new ApiException(HttpStatus.BAD_REQUEST, "startAt格式应为2026-11-16T14:00:00"); }
         LocalDateTime end = start.plusHours(hours);
-        if (!start.toLocalDate().equals(end.toLocalDate()) || start.getHour() < 10 || end.getHour() > 22 ||
-                start.getMinute() != 0 || start.isBefore(LocalDateTime.now(ZoneId.of("Asia/Shanghai")).plusHours(24)))
-            throw new ApiException(HttpStatus.BAD_REQUEST, "需至少提前24小时预约上海时间10:00至22:00内的非过夜整点时段");
+        if (!start.toLocalDate().equals(end.toLocalDate()) || start.getHour() < 7 || end.getHour() > 21 ||
+                start.getMinute() != 0 || start.getSecond() != 0 || !start.isAfter(LocalDateTime.now(ZoneId.of("Asia/Shanghai"))))
+            throw new ApiException(HttpStatus.BAD_REQUEST, "仅支持未来上海时间07:00至21:00内的非过夜整点时段");
+        Timestamp startAt = Timestamp.valueOf(start), endAt = Timestamp.valueOf(end);
+        requireShortNoticeConfirmation(user, svc, startAt, endAt);
         long amount = Math.multiplyExact(((Number) svc.get("price_per_hour")).longValue(), hours);
         String id = "qt-" + UUID.randomUUID();
         LocalDateTime expiry = LocalDateTime.now().plusMinutes(15);
@@ -156,7 +196,6 @@ public class MarketplaceController {
             @RequestHeader(value="X-Demo-User",required=false) String demo,@RequestHeader("Idempotency-Key") String key,
             @RequestBody Map<String, Object> body) {
         String user=actor(bearer,demo);
-        role(user, "customer");
         if (key.isBlank()) throw new ApiException(HttpStatus.BAD_REQUEST, "Idempotency-Key不能为空");
         List<String> previous = db.queryForList("SELECT result_id FROM idempotency_record WHERE actor_id = ? " +
             "AND operation = 'create_order' AND request_key = ?", String.class, user, key);
@@ -172,12 +211,8 @@ public class MarketplaceController {
         String coser = (String) svc.get("coser_id");
         // Serialize overlapping bookings for the same Coser, including requests with different keys.
         db.queryForList("SELECT user_id FROM coser_profile WHERE user_id = ? FOR UPDATE", coser);
-        if (!"published".equals(svc.get("status")) || !Boolean.TRUE.equals(svc.get("deposit_qualified")))
-            throw new ApiException(HttpStatus.CONFLICT, "服务已停止交易");
-        List<Map<String, Object>> identities = db.queryForList("SELECT user_id, legal_gender FROM identity_verification " +
-            "WHERE user_id IN (?, ?) AND status = 'verified' AND adult = TRUE", user, coser);
-        if (identities.size() != 2 || !Objects.equals(identities.get(0).get("legal_gender"), identities.get(1).get("legal_gender")))
-            throw new ApiException(HttpStatus.FORBIDDEN, "双方下单资格不匹配");
+        requireTradable(svc);
+        requireFemaleAdults(user, coser);
         Timestamp start = (Timestamp) quote.get("start_at");
         Timestamp end = (Timestamp) quote.get("end_at");
         List<String> windows = db.queryForList("SELECT id FROM availability_slot WHERE coser_id=? AND status='open' " +
@@ -190,8 +225,7 @@ public class MarketplaceController {
             "AND review_status = 'approved' AND category IN ('exhibition','museum','mall','cafe','park')", venueId);
         if (venues.isEmpty() || !Objects.equals(venues.get(0).get("city"), svc.get("city")))
             throw new ApiException(HttpStatus.BAD_REQUEST, "地点不是该城市允许的公共场所");
-        if (start.toLocalDateTime().isBefore(LocalDateTime.now(ZoneId.of("Asia/Shanghai")).plusHours(24)))
-            throw new ApiException(HttpStatus.CONFLICT, "预约时间不足24小时");
+        requireShortNoticeConfirmation(user, svc, start, end);
         Map<String,Object> policy=db.queryForMap("SELECT buffer_before_minutes,buffer_after_minutes,min_lead_minutes FROM coser_profile WHERE user_id=?",coser);
         int before=((Number)policy.get("buffer_before_minutes")).intValue(),after=((Number)policy.get("buffer_after_minutes")).intValue();
         Timestamp occupiedStart=Timestamp.valueOf(start.toLocalDateTime().minusMinutes(before));
@@ -224,7 +258,6 @@ public class MarketplaceController {
     public List<Map<String, Object>> orders(@RequestHeader(value="Authorization",required=false) String bearer,
             @RequestHeader(value="X-Demo-User",required=false) String demo) {
         String user=actor(bearer,demo);
-        role(user, "customer");
         return db.queryForList("SELECT id, service_id AS \"serviceId\", status, payable_amount AS \"payableAmount\" " +
             "FROM booking_order WHERE customer_id = ? ORDER BY created_at DESC", user);
     }

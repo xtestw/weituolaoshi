@@ -40,6 +40,8 @@ public class IdentityController {
         try { birth=LocalDate.parse(number.substring(6,14),java.time.format.DateTimeFormatter.BASIC_ISO_DATE); }
         catch(Exception ex) { throw new ApiException(HttpStatus.BAD_REQUEST,"出生日期无效"); }
         if(birth.plusYears(18).isAfter(LocalDate.now(ZoneId.of("Asia/Shanghai")))) throw new ApiException(HttpStatus.FORBIDDEN,"未满18周岁不能认证");
+        if("coser".equals(mode) && (number.charAt(16)-'0')%2!=0)
+            throw new ApiException(HttpStatus.FORBIDDEN,"全女平台仅支持女性申请Coser认证");
         if(providerUrl.isBlank()||providerKey.isBlank()||digestKey.isBlank()) throw new ApiException(HttpStatus.SERVICE_UNAVAILABLE,"实名核验服务尚未配置");
         Map<?,?> result;
         try {

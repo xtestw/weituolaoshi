@@ -1,7 +1,8 @@
 const { get, set } = require('../../utils/store')
 const { bookingEligibility } = require('../../utils/eligibility')
+const { wechatLogin, currentUser, logout } = require('../../services/api')
 Page({
-  data: { role: 'customer', verified: false, genderLabel: '', coserVerified: false, favorites: 0, emergencyContactSet: false, bPendingCount: 1, bServiceCount: 1, averageScore: '—', scoredOrders: 0, coserIncompleteCount: 0, schedulePreview: [] },
+  data: { role: 'customer', verified: false, genderLabel: '', coserVerified: false, favorites: 0, emergencyContactSet: false, bPendingCount: 1, bServiceCount: 1, averageScore: '—', scoredOrders: 0, coserIncompleteCount: 0, schedulePreview: [], loggedIn: false, loginLoading: false, accountName: '微信登录 / 注册', accountInitial: '我', accountAvatar: '', authError: '' },
   onShow() {
     if (typeof this.getTabBar === 'function' && this.getTabBar()) this.getTabBar().setData({ selected: 3, hidden: false })
     const coserReview = get('coserVerification', { status: 'unverified' })
@@ -26,6 +27,30 @@ Page({
     const role = coserVerified && get('role', 'customer') === 'coser' ? 'coser' : 'customer'
     if (!coserVerified) set('role', 'customer')
     this.setData({ role, verified: !!(verification && verification.verified), eligible: bookingEligibility().allowed, coserVerified, favorites: get('favorites', []).length, emergencyContactSet: !!get('emergencyContact', null), bPendingCount: bOrderAccepted ? 0 : 1, bServiceCount: bOrderAccepted ? 2 : 1, averageScore, scoredOrders: reviews.length, coserIncompleteCount, schedulePreview, scheduleMonth: `${year}年${month}月` })
+    this.showAccount(wx.getStorageSync('account_token') ? wx.getStorageSync('account_user') : null)
+    if (wx.getStorageSync('account_token')) currentUser().then(user => this.showAccount(user)).catch(error => {
+      if (error.statusCode === 401) this.showAccount(null)
+      else this.setData({ authError: '账号暂时无法同步，请检查网络后重试' })
+    })
+  },
+  showAccount(user) {
+    const name = user && user.nickname ? user.nickname : '微信用户'
+    const avatar = user && user.avatarUrl ? user.avatarUrl : ''
+    this.setData({ loggedIn: !!user, accountName: user ? name : '微信登录 / 注册', accountInitial: user ? name.slice(0, 1) : '我', accountAvatar: avatar && avatar.startsWith('/') ? `${getApp().globalData.apiBaseUrl}${avatar}` : avatar, authError: '' })
+  },
+  async loginAccount() {
+    if (this.data.loginLoading || this.data.loggedIn) return
+    this.setData({ loginLoading: true, authError: '' })
+    try { this.showAccount(await wechatLogin()) }
+    catch (error) { this.setData({ authError: error.message === 'API_NOT_CONFIGURED' ? '服务尚未配置，请联系平台' : (error.message || '登录失败，请重试') }) }
+    finally { this.setData({ loginLoading: false }) }
+  },
+  exitAccount() {
+    wx.showModal({ title: '退出登录', content: '退出后需重新使用微信登录。', success: async ({ confirm }) => {
+      if (!confirm) return
+      try { await logout(); this.showAccount(null) }
+      catch (error) { this.setData({ authError: error.message || '退出失败，请重试' }) }
+    } })
   },
   setRole(event) { if (!this.data.coserVerified) return; const role = event.currentTarget.dataset.role; set('role', role); this.setData({ role }) },
   openOrders() { wx.navigateTo({ url: '/pages/orders/index' }) },
