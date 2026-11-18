@@ -4,6 +4,7 @@ import java.nio.file.*;
 import java.security.MessageDigest;
 import java.time.*;
 import java.util.*;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.*;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -16,11 +17,12 @@ import org.springframework.web.multipart.MultipartFile;
 @RequestMapping("/v1")
 public class AccountController {
     private final JdbcTemplate db;
+    private final ObjectMapper json;
     private final RestTemplate http = new RestTemplate();
     @Value("${wechat.app-id:}") private String appId;
     @Value("${wechat.app-secret:}") private String appSecret;
     @Value("${account.avatar-directory:./data/avatars}") private String avatarDirectory;
-    public AccountController(JdbcTemplate db) { this.db = db; }
+    public AccountController(JdbcTemplate db, ObjectMapper json) { this.db = db; this.json = json; }
 
     private String hash(String value) {
         try {
@@ -56,7 +58,8 @@ public class AccountController {
             String url = "https://api.weixin.qq.com/sns/jscode2session?appid=" + java.net.URLEncoder.encode(appId, "UTF-8") +
                 "&secret=" + java.net.URLEncoder.encode(appSecret, "UTF-8") + "&js_code=" +
                 java.net.URLEncoder.encode((String) code, "UTF-8") + "&grant_type=authorization_code";
-            result = http.getForObject(url, Map.class);
+            String response = http.getForObject(url, String.class);
+            result = json.readValue(response, Map.class);
         } catch (Exception ex) { throw new ApiException(HttpStatus.BAD_GATEWAY, "微信登录服务暂不可用"); }
         String openid = result == null ? null : (String) result.get("openid");
         if (openid == null || openid.isBlank()) throw new ApiException(HttpStatus.UNAUTHORIZED, "微信登录凭证无效");

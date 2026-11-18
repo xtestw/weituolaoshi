@@ -2,12 +2,12 @@ const { get, set } = require('../../utils/store')
 const { bookingEligibility } = require('../../utils/eligibility')
 const { wechatLogin, currentUser, logout } = require('../../services/api')
 Page({
-  data: { role: 'customer', verified: false, genderLabel: '', coserVerified: false, favorites: 0, emergencyContactSet: false, bPendingCount: 1, bServiceCount: 1, averageScore: '—', scoredOrders: 0, coserIncompleteCount: 0, schedulePreview: [], loggedIn: false, loginLoading: false, accountName: '微信登录 / 注册', accountInitial: '我', accountAvatar: '', authError: '' },
+  data: { role: 'customer', verified: false, genderLabel: '', coserVerified: false, favorites: 0, emergencyContactSet: false, bPendingCount: 1, bServiceCount: 1, averageScore: '—', scoredOrders: 0, coserIncompleteCount: 0, schedulePreview: [], loggedIn: false, loginLoading: false, logoutLoading: false, accountName: '微信登录 / 注册', accountInitial: '我', accountAvatar: '', authError: '' },
   onShow() {
     if (typeof this.getTabBar === 'function' && this.getTabBar()) this.getTabBar().setData({ selected: 3, hidden: false })
     const coserReview = get('coserVerification', { status: 'unverified' })
     const verification = get('verification', null)
-    const coserVerified = coserReview.status === 'verified'
+    const coserVerified = !!wx.getStorageSync('account_token') && coserReview.status === 'verified'
     const bOrderAccepted = get('bOrderAccepted', false)
     const reviews = Array.from(new Map(get('orderReviews', []).filter((item) => item.coserId === 'mine' && Number(item.score) >= 1 && Number(item.score) <= 5).map((item) => [item.orderId, item])).values())
     const cases = get('responsibilityCases', [])
@@ -46,10 +46,19 @@ Page({
     finally { this.setData({ loginLoading: false }) }
   },
   exitAccount() {
+    if (this.data.logoutLoading) return
     wx.showModal({ title: '退出登录', content: '退出后需重新使用微信登录。', success: async ({ confirm }) => {
       if (!confirm) return
-      try { await logout(); this.showAccount(null) }
+      this.setData({ logoutLoading: true, authError: '' })
+      try {
+        await logout()
+        set('role', 'customer')
+        this.showAccount(null)
+        this.setData({ role: 'customer', coserVerified: false })
+        wx.showToast({ title: '已退出登录', icon: 'success' })
+      }
       catch (error) { this.setData({ authError: error.message || '退出失败，请重试' }) }
+      finally { this.setData({ logoutLoading: false }) }
     } })
   },
   setRole(event) { if (!this.data.coserVerified) return; const role = event.currentTarget.dataset.role; set('role', role); this.setData({ role }) },

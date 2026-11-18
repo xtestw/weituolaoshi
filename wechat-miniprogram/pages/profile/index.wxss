@@ -1,8 +1,10 @@
 .profile-head { padding: calc(env(safe-area-inset-top) + 88rpx) 28rpx 30rpx; background: linear-gradient(160deg,var(--color-primary-soft),var(--color-cta-soft)); }
 .profile-head__bar { position: relative; height: 88rpx; display: flex; align-items: center; justify-content: space-between; }
 .profile-head__bar>text { font-size: var(--type-page); line-height: 1.25; font-weight: var(--weight-page); }
-.profile-head__logout { min-height: 88rpx; margin: 0; padding: 0 12rpx; border: 0; background: transparent; color: var(--color-muted); font-size: 24rpx; }
-.profile-head__logout::after { border: 0; }
+.profile-logout { width: 100%; min-height: 88rpx; margin: 32rpx 0 0; display: flex; align-items: center; justify-content: center; border: 1rpx solid var(--color-border); border-radius: 24rpx; background: var(--color-surface); color: var(--color-muted); font-size: 28rpx; font-weight: 650; }
+.profile-logout::after { border: 0; }
+.profile-logout:active { background: var(--color-primary-soft); }
+.profile-logout[disabled] { opacity: .55; }
 .person { display: flex; align-items: center; gap: 20rpx; }
 .avatar { width: 112rpx; height: 112rpx; flex: none; display: flex; align-items: center; justify-content: center; border-radius: 38rpx; background: linear-gradient(145deg,var(--color-primary),#a67ce7); color: #fff; font-size: 40rpx; font-weight: 800; }
 .avatar image { width: 112rpx; height: 112rpx; border-radius: 38rpx; }
