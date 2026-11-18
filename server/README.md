@@ -40,6 +40,18 @@ curl -X POST http://localhost:8080/v1/orders \
 个人页使用 `wx.login` 换取 30 天会话；首次登录时以微信 OpenID 自动注册平台账号，后续登录复用账号。小程序缓存会话，401 时清除并引导重新登录，可主动退出。微信不再自动提供昵称、头像，因此新账号默认显示“微信用户”；账号可修改昵称（1–30 字）及上传不超过 2MB 的 JPEG、PNG 或 WebP 头像。认证、订单等其他页面尚有本地演示状态，不能视为已完成全链路账号接入。
 头像默认保存在 `./data/avatars`，生产环境可通过 `AVATAR_DIRECTORY` 指向持久目录。
 
+### Coser 档期（已接入服务端）
+
+已认证且账号正常的成年女性 Coser 可通过会话令牌管理按日档期；默认不可约，开放日对应上海时间 07:00–21:00，不支持夜间或过夜。已被有效订单占用的日期不能关闭或重设。可设置范围为本月至下一自然年 12 月。
+
+```text
+GET  /v1/cosers/me/availability?month=2026-11
+PUT  /v1/cosers/me/availability/2026-11-20  {"open":true}
+POST /v1/cosers/me/availability/batch       {"month":"2026-11","type":"weekdays_open"}
+```
+
+批量类型为 `all_open`、`all_closed`、`weekdays_open`、`weekends_open`；工作日和周末操作只修改匹配的日期，过去日期不变。读接口返回该月每天的 `date` 和 `open`。小程序档期页面目前仍使用本地缓存，下一步需把它接入这些接口。
+
 ### 实名认证
 
 设置 `IDENTITY_PROVIDER_URL`、`IDENTITY_PROVIDER_KEY` 和随机生成的 `IDENTITY_DIGEST_KEY`。服务端向核验服务发送 `POST` JSON：`{"name":"...","idNumber":"..."}`，请求头为 `Authorization: Bearer <key>`；核验服务须返回 `{"verified":true,"reference":"核验流水号"}` 才会通过。未配置或核验失败时不会写入已认证状态。前端不缓存完整证件号码，数据库只保存脱敏号码、带密钥摘要、核验流水号及成年/性别结论。供应商应由项目方选择并完成相应合规接入。
