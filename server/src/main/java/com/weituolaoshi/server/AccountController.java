@@ -44,7 +44,7 @@ public class AccountController {
     }
 
     private Map<String, Object> profile(String id) {
-        return db.queryForMap("SELECT id, nickname, avatar_url AS \"avatarUrl\" FROM app_user WHERE id = ?", id);
+        return db.queryForMap("SELECT id, nickname, avatar_url AS \"avatarUrl\", role FROM app_user WHERE id = ?", id);
     }
 
     @PostMapping("/auth/wechat-login")

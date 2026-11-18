@@ -3,7 +3,8 @@
   "packOptions": {
     "ignore": [
       { "type": "folder", "value": "docs" },
-      { "type": "file", "value": "services/api.test.js" }
+      { "type": "file", "value": "services/api.test.js" },
+      { "type": "folder", "value": "tests" }
     ]
   },
   "setting": {

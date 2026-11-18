@@ -64,6 +64,17 @@ class AvailabilityControllerTest {
         assertTrue(openFor(result, date));
     }
 
+    @Test void accountProfileExposesServerRole() throws Exception {
+        JsonNode login = body(mvc.perform(post("/v1/dev/login")
+            .contentType(MediaType.APPLICATION_JSON).content("{}"))
+            .andExpect(status().isOk()).andReturn());
+        assertEquals("customer", login.get("user").get("role").asText());
+        JsonNode profile = body(mvc.perform(get("/v1/users/me")
+            .header("Authorization", "Bearer " + login.get("token").asText()))
+            .andExpect(status().isOk()).andReturn());
+        assertEquals("customer", profile.get("role").asText());
+    }
+
     @Test void cannotCloseDayHeldByOrder() throws Exception {
         LocalDate date = LocalDate.now(ZoneId.of("Asia/Shanghai")).plusDays(6);
         mvc.perform(put("/v1/cosers/me/availability/" + date).header("X-Demo-User", "demo-coser-f")

@@ -50,7 +50,7 @@ PUT  /v1/cosers/me/availability/2026-11-20  {"open":true}
 POST /v1/cosers/me/availability/batch       {"month":"2026-11","type":"weekdays_open"}
 ```
 
-批量类型为 `all_open`、`all_closed`、`weekdays_open`、`weekends_open`；工作日和周末操作只修改匹配的日期，过去日期不变。读接口返回该月每天的 `date` 和 `open`。小程序档期页面目前仍使用本地缓存，下一步需把它接入这些接口。
+批量类型为 `all_open`、`all_closed`、`weekdays_open`、`weekends_open`；工作日和周末操作只修改匹配的日期，过去日期不变。读接口返回该月每天的 `date` 和 `open`。小程序档期页面已接入这些接口；未登录或账号不是已审核 Coser 时，服务端拒绝修改。
 
 ### 实名认证
 

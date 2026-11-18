@@ -35,6 +35,6 @@ public class LocalDevController {
         String token=UUID.randomUUID().toString()+UUID.randomUUID();
         db.update("INSERT INTO user_session(token_hash,user_id,expires_at) VALUES (?,?,?)",
             auth.hash(token),id,Timestamp.valueOf(LocalDateTime.now().plusHours(8)));
-        return Map.of("token",token,"user",db.queryForMap("SELECT id,nickname,avatar_url AS \"avatarUrl\" FROM app_user WHERE id=?",id));
+        return Map.of("token",token,"user",db.queryForMap("SELECT id,nickname,avatar_url AS \"avatarUrl\",role FROM app_user WHERE id=?",id));
     }
 }

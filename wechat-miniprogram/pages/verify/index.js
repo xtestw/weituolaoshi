@@ -1,4 +1,5 @@
 const { set } = require('../../utils/store')
+const { verifyIdentity } = require('../../services/api')
 
 function parseId(id) {
   const birth = id.slice(6, 14)
@@ -20,7 +21,8 @@ Page({
   },
   onField(event) { this.setData({ [event.currentTarget.dataset.field]: event.detail.value }) },
   onAgree(event) { this.setData({ agreed: event.detail.value.length > 0 }) },
-  submit() {
+  async submit() {
+    if (this.data.submitting) return
     const name = this.data.name.trim()
     const id = this.data.idNumber.trim().toUpperCase()
     const errors = {}
@@ -30,17 +32,21 @@ Page({
     this.setData({ errors })
     if (Object.keys(errors).length) return
     const result = parseId(id)
-    if (!result.adult || result.gender !== 'F') {
-      set('verification', { verified: true, adult: result.adult, gender: result.gender })
-      return wx.showModal({ title: '身份核验完成', content: !result.adult ? '未满18周岁可继续浏览，暂不能下单或发布服务。' : '平台目前仅向女性提供下单和Coser发布服务，你仍可浏览内容。', showCancel: false, success: () => wx.navigateBack() })
-    }
+    if (!result.adult) return this.setData({ errors: { submit: '未满18周岁可继续浏览，暂不能下单或发布服务。' } })
+    if (this.data.mode === 'coser' && result.gender !== 'F')
+      return this.setData({ errors: { submit: '全女平台仅支持女性申请Coser认证。' } })
+    if (!wx.getStorageSync('account_token'))
+      return this.setData({ errors: { submit: '请先在“我的”页面完成微信登录。' } })
     this.setData({ submitting: true })
-    setTimeout(() => {
-      set('verification', { verified: true, adult: true, gender: 'F' })
-      if (this.data.mode === 'coser') set('coserVerification', { status: 'pending', reason: '', submittedAt: Date.now() })
-      this.setData({ submitting: false })
-      wx.showToast({ title: this.data.mode === 'coser' ? '已提交审核' : '认证完成' })
+    try {
+      const identity = await verifyIdentity({ name, idNumber: id, mode: this.data.mode, agreed: true })
+      set('verification', { verified: identity.status === 'verified', adult: identity.adult === true, gender: identity.gender })
+      if (this.data.mode === 'coser') set('coserVerification', { status: identity.status, reason: identity.reason || '', submittedAt: Date.now() })
+      this.setData({ idNumber: '' })
+      wx.showToast({ title: identity.status === 'pending' ? '已提交审核' : '认证完成', icon: 'success' })
       setTimeout(() => wx.navigateBack(), 500)
-    }, 650)
+    } catch (error) {
+      this.setData({ errors: { submit: error.message || '核验失败，请稍后重试' } })
+    } finally { this.setData({ submitting: false }) }
   }
 })

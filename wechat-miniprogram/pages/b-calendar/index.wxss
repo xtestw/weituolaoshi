@@ -12,9 +12,12 @@
 .day text:first-child { color: var(--color-text); font-size: 28rpx; font-weight: 750; }
 .day--open { background: var(--color-success-soft); color: var(--color-success); }
 .day--selected { border-color: var(--color-primary); }
+.day[disabled] { opacity: .5; }
+.calendar-error { display: block; margin-top: 20rpx; color: #b42339; font-size: 24rpx; line-height: 1.45; }
 .calendar-hint,.batch__hint { display: block; margin-top: 20rpx; color: var(--color-muted); font-size: 23rpx; }
 .batch { padding-top: 18rpx; padding-bottom: 18rpx; }
 .batch button { width: 100%; min-height: 84rpx; margin: 0; padding: 0 4rpx; display: flex; align-items: center; justify-content: space-between; border: 0; border-bottom: 1rpx solid var(--color-border); background: transparent; color: var(--color-text); text-align: left; font-size: 26rpx; }
 .batch button text { color: var(--color-muted-soft); }
+.batch button[disabled] { opacity: .55; }
 .batch__applied { color: var(--color-primary-ink); font-weight: 750; }
 .batch__applied text { color: var(--color-success); }
