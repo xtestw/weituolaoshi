@@ -1,7 +1,7 @@
 const { get, set } = require('../../utils/store')
-const { request, wechatLogin, currentUser, logout } = require('../../services/api')
+const { request, wechatLogin, currentUser, logout, uploadAvatar } = require('../../services/api')
 Page({
-  data: { role: 'customer', verified: false, genderLabel: '', coserVerified: false, favorites: 0, emergencyContactSet: false, bPendingCount: 1, bServiceCount: 1, averageScore: '—', scoredOrders: 0, coserIncompleteCount: 0, schedulePreview: [], loggedIn: false, loginLoading: false, logoutLoading: false, accountName: '微信登录 / 注册', accountInitial: '我', accountAvatar: '', authError: '' },
+  data: { role: 'customer', verified: false, genderLabel: '', coserVerified: false, favorites: 0, emergencyContactSet: false, bPendingCount: 1, bServiceCount: 1, averageScore: '—', scoredOrders: 0, coserIncompleteCount: 0, schedulePreview: [], loggedIn: false, loginLoading: false, logoutLoading: false, accountName: '微信登录 / 注册', accountInitial: '我', accountAvatar: '', authError: '', profileEditing: false, profileSaving: false, draftNickname: '', draftAvatar: '' },
   onShow() {
     if (typeof this.getTabBar === 'function' && this.getTabBar()) this.getTabBar().setData({ selected: 3, hidden: false })
     const cachedUser = wx.getStorageSync('account_user')
@@ -40,6 +40,35 @@ Page({
     const role = coserVerified && get('role', 'customer') === 'coser' ? 'coser' : 'customer'
     this.setData({ loggedIn: !!user, coserVerified, role, accountName: user ? name : '微信登录 / 注册', accountInitial: user ? name.slice(0, 1) : '我', accountAvatar: avatar && avatar.startsWith('/') ? `${getApp().globalData.apiBaseUrl}${avatar}` : avatar, authError: '' })
   },
+  editProfile() {
+    if (!this.data.loggedIn) return
+    this.setData({ profileEditing: true, draftNickname: this.data.accountName, draftAvatar: '', authError: '' })
+  },
+  cancelProfile() { this.setData({ profileEditing: false, draftAvatar: '', authError: '' }) },
+  onNickname(event) { this.setData({ draftNickname: event.detail.value }) },
+  onChooseAvatar(event) {
+    const path = event.detail.avatarUrl
+    if (path) this.setData({ draftAvatar: path })
+  },
+  async saveProfile() {
+    if (this.data.profileSaving) return
+    const nickname = this.data.draftNickname.trim()
+    if (!nickname || nickname.length > 30) return this.setData({ authError: '昵称长度须为1至30字' })
+    this.setData({ profileSaving: true, authError: '' })
+    try {
+      const user = await request('/v1/users/me', { method: 'PATCH', data: { nickname } })
+      wx.setStorageSync('account_user', user)
+      this.showAccount(user)
+      if (this.data.draftAvatar) {
+        const withAvatar = await uploadAvatar(this.data.draftAvatar)
+        wx.setStorageSync('account_user', withAvatar)
+        this.showAccount(withAvatar)
+      }
+      this.setData({ profileEditing: false, draftAvatar: '' })
+      wx.showToast({ title: '资料已保存', icon: 'success' })
+    } catch (error) { this.setData({ authError: error.message || '保存失败，请重试' }) }
+    finally { this.setData({ profileSaving: false }) }
+  },
   syncIdentity() {
     return request('/v1/identity/me').then(identity => {
       const verified = identity.status === 'verified'
@@ -77,7 +106,7 @@ Page({
         await logout()
         set('role', 'customer')
         this.showAccount(null)
-        this.setData({ role: 'customer', coserVerified: false, verified: false, eligible: false })
+        this.setData({ role: 'customer', coserVerified: false, verified: false, eligible: false, profileEditing: false, draftAvatar: '' })
         wx.showToast({ title: '已退出登录', icon: 'success' })
       }
       catch (error) { this.setData({ authError: error.message || '退出失败，请重试' }) }
