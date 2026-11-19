@@ -52,7 +52,7 @@
 
 统一入口位于 `services/api.js`。配置 `app.js` 的 `apiBaseUrl` 后，逐步替换页面内本地模拟逻辑。
 
-“我的”页面提供微信登录 / 注册、会话恢复与退出。开发者工具默认请求本机 `http://127.0.0.1:8080`，且默认使用真实 `wx.login`；测试前须在服务端设置 `WECHAT_APP_ID=wx2a40389a906e9916` 和 `WECHAT_APP_SECRET`。不想使用真实微信登录时，才在 `app.js` 显式设置 `useDemoAccount: true` 并用 `local` 服务端环境。真机或正式环境需把 `apiBaseUrl` 换为已配置合法域名的 HTTPS 地址，不要把 AppSecret 写入小程序代码。
+“我的”页面提供微信登录 / 注册、会话恢复与退出。开发者工具默认请求本机 `http://127.0.0.1:18080`，使用仅在服务端 `local` 配置开放的演示账号，可直接体验登录和退出；此入口返回固定测试用户，不会创建真实微信账号。需要在开发者工具验证真实 `wx.login` 时，先在服务端设置 `WECHAT_APP_ID=wx2a40389a906e9916` 和 `WECHAT_APP_SECRET`，并把 `app.js` 中开发者工具的 `useDemoAccount` 改为 `false`。真机或正式环境仍使用真实微信登录，需把 `apiBaseUrl` 换为已配置合法域名的 HTTPS 地址，不要把 AppSecret 写入小程序代码。
 
 建议最少提供以下接口：
 
