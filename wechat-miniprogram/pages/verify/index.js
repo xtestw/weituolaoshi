@@ -1,5 +1,5 @@
 const { set } = require('../../utils/store')
-const { verifyIdentity } = require('../../services/api')
+const { startFaceIdentity, completeFaceIdentity, currentUser } = require('../../services/api')
 
 function parseId(id) {
   const birth = id.slice(6, 14)
@@ -37,16 +37,29 @@ Page({
       return this.setData({ errors: { submit: '全女平台仅支持女性申请Coser认证。' } })
     if (!wx.getStorageSync('account_token'))
       return this.setData({ errors: { submit: '请先在“我的”页面完成微信登录。' } })
+    if (typeof wx.startVerify !== 'function')
+      return this.setData({ errors: { submit: '腾讯云人脸核身 SDK 尚未安装，请联系平台。' } })
     this.setData({ submitting: true })
     try {
-      const identity = await verifyIdentity({ name, idNumber: id, mode: this.data.mode, agreed: true })
-      set('verification', { verified: identity.status === 'verified', adult: identity.adult === true, gender: identity.gender })
-      if (this.data.mode === 'coser') set('coserVerification', { status: identity.status, reason: identity.reason || '', submittedAt: Date.now() })
+      const { bizToken } = await startFaceIdentity({ name, idNumber: id, mode: this.data.mode, agreed: true })
       this.setData({ idNumber: '' })
-      wx.showToast({ title: '认证完成', icon: 'success' })
-      setTimeout(() => wx.navigateBack(), 500)
+      wx.startVerify({
+        data: { token: bizToken },
+        success: () => setTimeout(async () => {
+          try {
+            const identity = await completeFaceIdentity(bizToken)
+            set('verification', { verified: identity.status === 'verified', adult: identity.adult === true, gender: identity.gender })
+            if (this.data.mode === 'coser') set('coserVerification', { status: identity.status, reason: '', submittedAt: Date.now() })
+            await currentUser()
+            wx.showToast({ title: '人脸核身完成', icon: 'success' })
+            setTimeout(() => wx.navigateBack(), 500)
+          } catch (error) { this.setData({ errors: { submit: error.message || '核身结果未通过' } }) }
+          finally { this.setData({ submitting: false }) }
+        }, 500),
+        fail: error => { this.setData({ submitting: false, errors: { submit: error.ErrorMsg || '人脸核身未完成' } }) }
+      })
     } catch (error) {
-      this.setData({ errors: { submit: error.message || '核验失败，请稍后重试' } })
-    } finally { this.setData({ submitting: false }) }
+      this.setData({ submitting: false, errors: { submit: error.message || '核身服务暂不可用' } })
+    }
   }
 })

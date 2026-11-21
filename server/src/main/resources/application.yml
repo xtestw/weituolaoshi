@@ -18,10 +18,16 @@ wechat:
   app-secret: ${WECHAT_APP_SECRET:}
 account:
   avatar-directory: ${AVATAR_DIRECTORY:./data/avatars}
+messages:
+  media-directory: ${MESSAGES_MEDIA_DIRECTORY:./data/messages}
 identity:
-  provider-url: ${IDENTITY_PROVIDER_URL:}
-  provider-key: ${IDENTITY_PROVIDER_KEY:}
   digest-key: ${IDENTITY_DIGEST_KEY:}
 admin:
   bootstrap-user: ${ADMIN_BOOTSTRAP_USER:}
   bootstrap-password: ${ADMIN_BOOTSTRAP_PASSWORD:}
+
+faceid:
+  secret-id: ${TENCENTCLOUD_SECRET_ID:}
+  secret-key: ${TENCENTCLOUD_SECRET_KEY:}
+  rule-id: ${TENCENT_FACEID_RULE_ID:}
+  region: ${TENCENT_FACEID_REGION:ap-guangzhou}

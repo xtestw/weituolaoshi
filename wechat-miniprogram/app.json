@@ -5,6 +5,7 @@
     "pages/coser/index",
     "pages/booking/index",
     "pages/verify/index",
+    "verify_mpsdk/index/index",
     "pages/orders/index",
     "pages/order-detail/index",
     "pages/messages/index",

@@ -1,8 +1,10 @@
 const { seedState } = require('./utils/store')
+const FaceVerify = require('./verify_mpsdk/main')
 
 App({
   onLaunch() {
     seedState()
+    FaceVerify.init()
     const isDevtools = wx.getSystemInfoSync().platform === 'devtools'
     this.globalData.localDevMode = isDevtools
     if (isDevtools) {

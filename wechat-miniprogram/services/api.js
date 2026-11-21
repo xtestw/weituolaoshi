@@ -28,8 +28,11 @@ function createPayment(orderId) {
     }))
 }
 
-function verifyIdentity(payload) {
-  return request('/v1/identity/verifications', { method: 'POST', data: payload })
+function startFaceIdentity(payload) {
+  return request('/v1/identity/face/start', { method: 'POST', data: payload })
+}
+function completeFaceIdentity(bizToken) {
+  return request('/v1/identity/face/complete', { method: 'POST', data: { bizToken } })
 }
 
 function wechatLogin() {
@@ -78,4 +81,4 @@ function uploadAvatar(filePath) {
     fail: reject
   }))
 }
-module.exports = { request, createPayment, verifyIdentity, wechatLogin, currentUser, logout, clearAccount, uploadAvatar }
+module.exports = { request, createPayment, startFaceIdentity, completeFaceIdentity, wechatLogin, currentUser, logout, clearAccount, uploadAvatar }

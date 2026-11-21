@@ -29,9 +29,15 @@ curl -X POST http://localhost:8080/v1/orders \
   -d '{"quoteId":"上一步返回的quoteId","venueId":"venue-demo-expo"}'
 ```
 
-订单创建在事务中复核已存的成年女性实名结论、档期、地点和24小时内的Coser时间确认，并写入订单事件及幂等记录；Coser不再需要缴纳保证金。可浏览的男性或未成年人不能下单或发布服务。服务时间限制为上海时间07:00–21:00、不可过夜。演示档期与地点仍来自本地夹具；支付、退款及结算仍返回 501。`X-Demo-User` 只供本地演示，不能作为生产认证；演示地点没有接入真实 POI 营业时间数据。小程序的订单等非账号页面目前仍使用本地缓存。聊天及Coser时间确认的写入接口尚未实现，因此真实的24小时内预约链路仍需在消息模块完成后才能开放。
+订单创建在事务中复核已存的成年女性实名结论、档期、地点和24小时内的Coser时间确认，并写入订单事件及幂等记录；Coser不再需要缴纳保证金。可浏览的男性或未成年人不能下单或发布服务。服务时间限制为上海时间07:00–21:00、不可过夜。演示档期与地点仍来自本地夹具；支付、退款及结算仍返回 501。`X-Demo-User` 只供本地演示，不能作为生产认证；演示地点没有接入真实 POI 营业时间数据。小程序的订单等非账号页面目前仍使用本地缓存。消息与Coser时间确认已接入服务端，但支付及完整订单流程仍待实现。
 
-生产环境应改用 PostgreSQL，移除演示数据迁移和演示身份头，并接入符合要求的实名供应商、对象存储、内容审核、支付及消息服务。
+生产环境应改用 PostgreSQL，移除演示数据迁移和演示身份头，并接入符合要求的实名供应商、对象存储、内容审核及支付服务。
+
+### 消息会话
+
+登录后用 `POST /v1/messages/conversations`（传 `serviceId` 或 `orderId`）创建或复用会话。`GET /v1/messages/conversations` 返回会话和未读数；`GET /v1/messages/conversations/{id}/messages` 返回最近 50 条，可用 `before` 时间游标加载更早消息；`POST .../messages` 发送文字并使用 `clientId` 幂等；`POST .../read` 标记已读。Coser 可通过 `POST .../confirm-time` 确认预约时间。
+
+小程序通过 `wss://<服务域名>/v1/messages/socket` 接收会话更新事件，连接后第一帧发送 `{"type":"auth","token":"会话令牌"}`。断线后重新拉取历史。上线前将 HTTPS、WSS 和图片上传/下载域名加入小程序合法域名。图片上传后默认待人工审核；可通过 `messages.media-directory` 配置持久目录并备份。管理员在消息审核和举报菜单处理内容、限制会话。文字中疑似站外导流的内容先进入待审核状态；上线前仍需接入专业内容安全服务。
 
 ### 微信账号
 
@@ -52,11 +58,11 @@ POST /v1/cosers/me/availability/batch       {"month":"2026-11","type":"weekdays_
 
 批量类型为 `all_open`、`all_closed`、`weekdays_open`、`weekends_open`；工作日和周末操作只修改匹配的日期，过去日期不变。读接口返回该月每天的 `date` 和 `open`。小程序档期页面已接入这些接口；未登录或账号不是已审核 Coser 时，服务端拒绝修改。
 
-### 实名认证
+### 人脸实名认证
 
-设置 `IDENTITY_PROVIDER_URL`、`IDENTITY_PROVIDER_KEY` 和随机生成的 `IDENTITY_DIGEST_KEY`。服务端向核验服务发送 `POST` JSON：`{"name":"...","idNumber":"..."}`，请求头为 `Authorization: Bearer <key>`；核验服务须返回 `{"verified":true,"reference":"核验流水号"}` 才会通过。未配置或核验失败时不会写入已认证状态。前端不缓存完整证件号码，数据库只保存脱敏号码、带密钥摘要、核验流水号及成年/性别结论。供应商应由项目方选择并完成相应合规接入。
+使用腾讯云慧眼微信小程序增强版人脸核身。服务端调用 `DetectAuth` 生成 BizToken；小程序通过官方 SDK 的 `wx.startVerify` 完成核验；服务端仅凭自己生成且绑定当前用户、未过期、未使用的 BizToken 调用 `GetDetectInfoEnhanced`，只读取文本结果，并在 `ErrCode=0`、身份证校验通过及成年条件满足时写入认证结论。Coser 还须满足身份证性别为女性。平台不保存人脸照片或视频；数据库只保存脱敏证件号、带密钥摘要、腾讯云请求流水号和认证结论。旧的二要素认证记录不会自动升级成人脸认证。
 
-普通用户和 Coser 均在实名供应商核验通过后立即生效；Coser 同时开通接单资料，无需后台人工审核。旧的待审核记录需重新提交核验。小程序从 `/v1/identity/me` 同步最新状态。腾讯云 `IdCardVerification` 可用于姓名与身份证号二要素核验，但当前服务端使用通用供应商适配接口，尚需接入腾讯云签名调用与开通凭证。二要素核验不能证明当前操作人就是证件持有人；若业务要求本人真人认证，应另接腾讯云人脸核身流程。
+腾讯云控制台开通服务并创建微信小程序业务流程后，配置 `TENCENTCLOUD_SECRET_ID`、`TENCENTCLOUD_SECRET_KEY`、`TENCENT_FACEID_RULE_ID` 和随机生成的 `IDENTITY_DIGEST_KEY`，可选配置 `TENCENT_FACEID_REGION`（默认 `ap-guangzhou`）。密钥仅放在服务端环境变量，不写入仓库。小程序 SDK 下载和安装步骤见 `wechat-miniprogram/README.md`。未配置时接口返回 503，不能用客户端回调绕过服务端结果查询。
 
 ### 管理后台
 
