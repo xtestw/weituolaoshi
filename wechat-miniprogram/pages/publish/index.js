@@ -8,11 +8,9 @@ Page({
     if (typeof this.getTabBar === 'function' && this.getTabBar()) this.getTabBar().setData({ selected: 1 })
     const review = get('coserVerification', { status: 'unverified', reason: '' })
     this.setData({ verified: review.status === 'verified', reviewStatus: review.status, reviewReason: review.reason || '', posts: get('posts', []), coserCity: get('coserCity', '') })
-    if (review.status === 'pending') this.simulateReview()
   },
   newPost() {
     if (get('verification', null) && !guardBooking()) return
-    if (this.data.reviewStatus === 'pending') return wx.showModal({ title: '认证审核中', content: '审核结果会通过平台消息通知，通过后即可发布帖子。', showCancel: false })
     if (!this.data.verified) return wx.navigateTo({ url: '/pages/verify/index?returnTo=publish&mode=coser' })
     if (!this.data.coserCity) return this.locateCity(() => wx.navigateTo({ url: '/pages/post-editor/index' }))
     wx.navigateTo({ url: '/pages/post-editor/index' })
@@ -28,16 +26,6 @@ Page({
     }, fail: () => wx.showToast({ title: '请允许定位后重试', icon: 'none' }) })
   },
   refreshCity() { this.locateCity() },
-  simulateReview() {
-    clearTimeout(this.reviewTimer)
-    this.reviewTimer = setTimeout(() => {
-      const result = { status: 'verified', reason: '', verifiedAt: Date.now() }
-      set('coserVerification', result)
-      this.setData({ verified: true, reviewStatus: 'verified' })
-      wx.showModal({ title: '真人认证已通过', content: '审核结果已同步到平台消息，现在可以发布帖子。', confirmText: '去发布', success: ({ confirm }) => confirm && this.newPost() })
-    }, 1200)
-  },
-  onUnload() { clearTimeout(this.reviewTimer) },
   viewHomepage() { wx.navigateTo({ url: '/pages/coser/index?id=mine' }) },
   edit(event) {
     const post = this.data.posts[event.currentTarget.dataset.index]

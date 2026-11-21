@@ -56,27 +56,6 @@ public class AdminController {
         permitted(header,"identity:read");
         return db.queryForList("SELECT v.id,v.user_id AS \"userId\",u.nickname,v.mode,v.status,v.masked_document_number AS \"maskedId\",v.legal_gender AS \"gender\",v.review_reason AS \"reason\",v.created_at AS \"createdAt\" FROM identity_verification v JOIN app_user u ON u.id=v.user_id ORDER BY v.created_at DESC LIMIT 200");
     }
-    @PatchMapping("/identities/{id}") @Transactional
-    public Map<String,Object> review(@RequestHeader(value="Authorization",required=false) String header,@PathVariable String id,@RequestBody Map<String,Object> body) {
-        String actor=permitted(header,"identity:review"); String decision=String.valueOf(body.get("decision"));
-        String reason=body.get("reason") instanceof String?((String)body.get("reason")).trim():"";
-        if(!decision.equals("verified")&&!decision.equals("rejected")) throw new ApiException(HttpStatus.BAD_REQUEST,"无效审核结果");
-        if(decision.equals("rejected")&&(reason.isBlank()||reason.length()>500)) throw new ApiException(HttpStatus.BAD_REQUEST,"请填写500字以内的驳回原因");
-        int changed=db.update("UPDATE identity_verification SET status=?,review_reason=?,verified_at=? WHERE id=? AND status='pending' AND mode='coser'",decision,reason,
-            decision.equals("verified")?Timestamp.valueOf(LocalDateTime.now()):null,id);
-        if(changed==0) throw new ApiException(HttpStatus.CONFLICT,"该申请不存在或已审核");
-        String userId=db.queryForObject("SELECT user_id FROM identity_verification WHERE id=?",String.class,id);
-        if(decision.equals("verified")) {
-            String gender=db.queryForObject("SELECT legal_gender FROM identity_verification WHERE id=?",String.class,id);
-            if(!"F".equals(gender)) throw new ApiException(HttpStatus.FORBIDDEN,"仅女性可成为Coser");
-            db.update("UPDATE app_user SET role='coser' WHERE id=?",userId);
-            Integer existing=db.queryForObject("SELECT COUNT(*) FROM coser_profile WHERE user_id=?",Integer.class,userId);
-            if(existing==null||existing==0) db.update("INSERT INTO coser_profile(user_id,display_name,city,verification_status,service_status) SELECT id,COALESCE(nickname,'微信用户'),'','verified','active' FROM app_user WHERE id=?",userId);
-            else db.update("UPDATE coser_profile SET verification_status='verified',service_status='active' WHERE user_id=?",userId);
-        } else db.update("UPDATE coser_profile SET verification_status='rejected',service_status='inactive' WHERE user_id=?",userId);
-        audit(actor,"identity.review",id,decision+" "+reason);
-        return Map.of("ok",true);
-    }
     @GetMapping("/users") public List<Map<String,Object>> users(@RequestHeader(value="Authorization",required=false) String header) {
         permitted(header,"users:read"); return db.queryForList("SELECT id,nickname,role,created_at AS \"createdAt\" FROM app_user ORDER BY created_at DESC LIMIT 200");
     }
@@ -131,5 +110,24 @@ public class AdminController {
     }
     @GetMapping("/audit") public List<Map<String,Object>> auditLog(@RequestHeader(value="Authorization",required=false) String header) {
         permitted(header,"audit:read"); return db.queryForList("SELECT a.action,a.target_id AS \"targetId\",a.detail,a.created_at AS \"createdAt\",u.username FROM admin_audit a JOIN admin_user u ON u.id=a.actor_id ORDER BY a.created_at DESC LIMIT 200");
+    }
+    @GetMapping("/messages") public List<Map<String,Object>> messages(@RequestHeader(value="Authorization",required=false) String header) {
+        permitted(header,"messages:read"); return db.queryForList("SELECT m.id,m.conversation_id AS \"conversationId\",m.sender_id AS \"senderId\",m.body,m.message_type AS \"type\",m.moderation_status AS \"status\",m.moderation_reason AS \"reason\",m.created_at AS \"createdAt\" FROM chat_message m ORDER BY m.created_at DESC LIMIT 200");
+    }
+    @GetMapping("/message-reports") public List<Map<String,Object>> messageReports(@RequestHeader(value="Authorization",required=false) String header) {
+        permitted(header,"messages:read"); return db.queryForList("SELECT r.id,r.message_id AS \"messageId\",r.reporter_id AS \"reporterId\",r.reason,r.status,r.created_at AS \"createdAt\" FROM message_report r ORDER BY r.created_at DESC LIMIT 200");
+    }
+    @PatchMapping("/messages/{id}") @Transactional public Map<String,Object> moderateMessage(@RequestHeader(value="Authorization",required=false) String header,@PathVariable String id,@RequestBody Map<String,Object> body) {
+        String actor=permitted(header,"messages:moderate"), decision=String.valueOf(body.getOrDefault("decision","")), reason=String.valueOf(body.getOrDefault("reason","")).trim();
+        if(!List.of("approved","rejected").contains(decision)||reason.length()>300) throw new ApiException(HttpStatus.BAD_REQUEST,"审核参数无效");
+        if(db.update("UPDATE chat_message SET moderation_status=?,moderation_reason=? WHERE id=?",decision,reason,id)==0) throw new ApiException(HttpStatus.NOT_FOUND,"消息不存在");
+        db.update("UPDATE message_report SET status='closed' WHERE message_id=?",id); audit(actor,"message.moderate",id,decision+" "+reason); return Map.of("ok",true);
+    }
+    @PatchMapping("/conversations/{id}/restriction") @Transactional public Map<String,Object> restrictConversation(@RequestHeader(value="Authorization",required=false) String header,@PathVariable String id,@RequestBody Map<String,Object> body) {
+        String actor=permitted(header,"messages:moderate"),reason=String.valueOf(body.getOrDefault("reason","")).trim(); boolean restricted=Boolean.TRUE.equals(body.get("restricted"));
+        if(reason.length()>300) throw new ApiException(HttpStatus.BAD_REQUEST,"原因过长");
+        if(db.queryForList("SELECT id FROM conversation WHERE id=?",String.class,id).isEmpty()) throw new ApiException(HttpStatus.NOT_FOUND,"会话不存在");
+        if(db.update("UPDATE conversation_restriction SET restricted=?,reason=?,updated_at=CURRENT_TIMESTAMP WHERE conversation_id=?",restricted,reason,id)==0) db.update("INSERT INTO conversation_restriction(conversation_id,restricted,reason) VALUES (?,?,?)",id,restricted,reason);
+        audit(actor,"conversation.restrict",id,restricted+" "+reason); return Map.of("ok",true);
     }
 }

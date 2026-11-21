@@ -4,7 +4,7 @@
 
   <button wx:if="{{verified}}" class="coser-city" bindtap="refreshCity"><text>服务城市</text><text>{{coserCity ? coserCity + ' · 重新定位' : '定位我的城市'}} ›</text></button>
 
-  <view class="primary-actions"><button class="new-post" bindtap="newPost"><view class="plus"></view><view><text>发布新帖</text><text>{{verified ? '发布新的角色服务' : (reviewStatus === 'pending' ? '真人认证审核中，结果将通过消息通知' : (reviewStatus === 'rejected' ? '认证未通过：' + reviewReason : '先完成真人认证'))}}</text></view><text>›</text></button></view>
+  <view class="primary-actions"><button class="new-post" bindtap="newPost"><view class="plus"></view><view><text>发布新帖</text><text>{{verified ? '发布新的角色服务' : '先完成真人认证'}}</text></view><text>›</text></button></view>
 
   <block wx:if="{{verified}}">
     <view class="section posts"><view class="section__head"><text class="section__title">我的帖子 · {{posts.length}}</text></view>

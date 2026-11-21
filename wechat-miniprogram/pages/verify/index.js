@@ -43,7 +43,7 @@ Page({
       set('verification', { verified: identity.status === 'verified', adult: identity.adult === true, gender: identity.gender })
       if (this.data.mode === 'coser') set('coserVerification', { status: identity.status, reason: identity.reason || '', submittedAt: Date.now() })
       this.setData({ idNumber: '' })
-      wx.showToast({ title: identity.status === 'pending' ? '已提交审核' : '认证完成', icon: 'success' })
+      wx.showToast({ title: '认证完成', icon: 'success' })
       setTimeout(() => wx.navigateBack(), 500)
     } catch (error) {
       this.setData({ errors: { submit: error.message || '核验失败，请稍后重试' } })

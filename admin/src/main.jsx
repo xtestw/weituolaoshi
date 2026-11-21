@@ -19,7 +19,7 @@ const fmt = value => value ? String(value).replace('T', ' ').slice(0, 19) : '—
 const statusColor = status => ({ verified: 'success', pending: 'processing', rejected: 'error', active: 'success', frozen: 'warning', closed: 'default' })[status] || 'default'
 const statusLabel = status => ({ verified: '已通过', pending: '待审核', rejected: '已驳回', active: '正常', frozen: '已冻结', closed: '已注销' })[status] || status || '—'
 const navItems = [
-  { key: 'identities', icon: <SafetyCertificateOutlined />, label: '认证审核', permission: 'identity:read' },
+  { key: 'identities', icon: <SafetyCertificateOutlined />, label: '实名认证', permission: 'identity:read' },
   { key: 'users', icon: <TeamOutlined />, label: '用户管理', permission: 'users:read' },
   { key: 'admins', icon: <UserOutlined />, label: '管理员', permission: 'admins:read' },
   { key: 'roles', icon: <KeyOutlined />, label: '角色权限', permission: 'admins:read' },
@@ -46,7 +46,7 @@ function App() {
   return <Layout className="app-shell">
     {screens.md ? <Sider width={230} className="app-sider" theme="dark"><div className="sider-brand"><div className="brand">次元委托</div><div className="brand-sub">管理后台</div></div>{menu}</Sider> : <Drawer title="次元委托 · 管理后台" placement="left" width={230} open={drawer} onClose={() => setDrawer(false)} styles={{ body: { padding: 0, background: '#001529' } }}>{menu}</Drawer>}
     <Layout><Header className="app-header"><Space>{!screens.md && <Button className="mobile-trigger" type="text" icon={<MenuOutlined />} onClick={() => setDrawer(true)} />}<Text strong>{current?.label || '工作台'}</Text></Space><div className="header-user"><Text className="username">{profile.username}</Text><Tag color="blue">{profile.roles?.join('、')}</Tag><Button type="text" icon={<LogoutOutlined />} onClick={logout}>退出</Button></div></Header>
-      <Content className="app-content"><h1 className="page-title">{current?.label || '工作台'}</h1><p className="page-caption">{({ identities: '查看实名申请并审核 Coser 认证', users: '查看平台用户信息', admins: '管理后台账号及角色', roles: '配置各角色可使用的功能', audit: '查看管理员操作记录' })[tab]}</p>{notice && <Alert type="error" showIcon closable message={notice} onClose={() => setNotice('')} style={{ marginBottom: 16 }} />}{!tab ? <Empty description="当前账号没有可用菜单" /> : <Page key={tab} tab={tab} profile={profile} setProfile={setProfile} setNotice={setNotice} />}</Content>
+      <Content className="app-content"><h1 className="page-title">{current?.label || '工作台'}</h1><p className="page-caption">{({ identities: '查看自动核验结果与脱敏证件信息', users: '查看平台用户信息', admins: '管理后台账号及角色', roles: '配置各角色可使用的功能', audit: '查看管理员操作记录' })[tab]}</p>{notice && <Alert type="error" showIcon closable message={notice} onClose={() => setNotice('')} style={{ marginBottom: 16 }} />}{!tab ? <Empty description="当前账号没有可用菜单" /> : <Page key={tab} tab={tab} profile={profile} setProfile={setProfile} setNotice={setNotice} />}</Content>
     </Layout>
   </Layout>
 }
@@ -57,15 +57,13 @@ function Page({ tab, profile, setProfile, setNotice }) {
   const [loading, setLoading] = useState(true)
   const [modal, setModal] = useState(null)
   const [form] = Form.useForm()
-  const canWrite = profile.permissions.includes(tab === 'identities' ? 'identity:review' : 'admins:write')
+  const canWrite = tab !== 'identities' && profile.permissions.includes('admins:write')
   const load = async () => { setLoading(true); try { if (tab === 'admins') { const [a, b] = await Promise.all([api('/admins'), api('/roles')]); setRows(a); setRoles(b) } else if (tab === 'roles') { const [a, b] = await Promise.all([api('/roles'), api('/permissions')]); setRows(a); setPermissions(b) } else setRows(await api('/' + tab)) } catch (error) { setNotice(error.message) } finally { setLoading(false) } }
   useEffect(() => { load() }, [tab])
   const success = async text => { message.success(text); setModal(null); form.resetFields(); await load() }
   const fail = error => message.error(error.message)
-  const review = (row, decision) => { form.resetFields(); setModal({ kind: 'review', row, decision }) }
   const submitModal = async values => {
     try {
-      if (modal.kind === 'review') await send('/identities/' + encodeURIComponent(modal.row.id), 'PATCH', { decision: modal.decision, reason: values.reason || '' })
       if (modal.kind === 'admin') await send('/admins', 'POST', values)
       if (modal.kind === 'role') await send('/roles', 'POST', values)
       if (modal.kind === 'reset') await send('/admins/' + encodeURIComponent(modal.row.id), 'PATCH', { password: values.password })
@@ -82,7 +80,6 @@ function Page({ tab, profile, setProfile, setNotice }) {
       { title: '状态', dataIndex: 'status', render: value => <Tag color={statusColor(value)}>{statusLabel(value)}</Tag> },
       { title: '原因', dataIndex: 'reason', render: value => value || '—' },
       { title: '提交时间', dataIndex: 'createdAt', render: fmt },
-      ...(canWrite ? [{ title: '操作', key: 'actions', render: (_, row) => row.status === 'pending' && row.mode === 'coser' ? <Space><Button size="small" type="primary" onClick={() => review(row, 'verified')}>通过</Button><Button size="small" danger onClick={() => review(row, 'rejected')}>驳回</Button></Space> : '—' }] : [])
     ],
     users: [{ title: '用户 ID', dataIndex: 'id' }, { title: '昵称', dataIndex: 'nickname', render: v => v || '—' }, { title: '角色', dataIndex: 'role' }, { title: '注册时间', dataIndex: 'createdAt', render: fmt }],
     admins: [{ title: '用户名', dataIndex: 'username' }, { title: '状态', dataIndex: 'enabled', render: v => <Tag color={v ? 'success' : 'default'}>{v ? '启用' : '禁用'}</Tag> }, { title: '操作', key: 'actions', render: (_, row) => canWrite && row.id !== profile.id ? <Space wrap><Select size="small" placeholder="修改角色" style={{ width: 125 }} options={roles.map(r => ({ value: r.id, label: r.name }))} onChange={role => changeAdmin(row, { role })} /><Switch size="small" checked={row.enabled} onChange={enabled => changeAdmin(row, { enabled })} /><Button size="small" onClick={() => { form.resetFields(); setModal({ kind: 'reset', row }) }}>重置密码</Button></Space> : '—' }],
@@ -90,8 +87,7 @@ function Page({ tab, profile, setProfile, setNotice }) {
   }
   return <>
     {tab === 'roles' ? <>{canWrite && <Button type="primary" style={{ marginBottom: 16 }} onClick={() => { form.resetFields(); setModal({ kind: 'role' }) }}>新建角色</Button>}{rows.map(role => <RoleCard key={role.id} role={role} permissions={permissions} canWrite={canWrite} onSave={savePermissions} />)}</> : <Card className="content-card" extra={tab === 'admins' && canWrite ? <Button type="primary" onClick={() => { form.resetFields(); setModal({ kind: 'admin' }) }}>新建管理员</Button> : null}><div className="table-scroll"><Table rowKey={row => row.id || `${row.createdAt}-${row.action}-${row.targetId}`} loading={loading} dataSource={rows} columns={columns[tab]} pagination={{ pageSize: 10, showSizeChanger: false }} /></div></Card>}
-    <Modal title={{ review: modal?.decision === 'verified' ? '通过 Coser 认证' : '驳回 Coser 认证', admin: '新建管理员', role: '新建角色', reset: '重置管理员密码' }[modal?.kind]} open={!!modal} onCancel={() => setModal(null)} onOk={() => form.submit()} okText="确认" cancelText="取消" destroyOnHidden><Form form={form} layout="vertical" onFinish={submitModal} style={{ paddingTop: 12 }}>
-      {modal?.kind === 'review' && <><Text>用户：{modal.row.nickname || modal.row.userId}</Text>{modal.decision === 'rejected' && <Form.Item name="reason" label="驳回原因" rules={[{ required: true, message: '请输入驳回原因' }, { max: 500 }]} style={{ marginTop: 16 }}><Input.TextArea rows={3} maxLength={500} showCount /></Form.Item>}</>}
+    <Modal title={{ admin: '新建管理员', role: '新建角色', reset: '重置管理员密码' }[modal?.kind]} open={!!modal} onCancel={() => setModal(null)} onOk={() => form.submit()} okText="确认" cancelText="取消" destroyOnHidden><Form form={form} layout="vertical" onFinish={submitModal} style={{ paddingTop: 12 }}>
       {modal?.kind === 'admin' && <><Form.Item name="username" label="用户名" rules={[{ required: true }, { pattern: /^[A-Za-z0-9_]{3,40}$/, message: '请输入 3–40 位字母、数字或下划线' }]}><Input /></Form.Item><Form.Item name="password" label="密码" rules={[{ required: true }, { min: 12, message: '密码至少 12 位' }]}><Input.Password autoComplete="new-password" /></Form.Item><Form.Item name="role" label="角色" rules={[{ required: true }]}><Select options={roles.map(r => ({ value: r.id, label: r.name }))} /></Form.Item></>}
       {modal?.kind === 'role' && <><Form.Item name="id" label="角色标识" rules={[{ required: true }, { pattern: /^[a-z_]{3,40}$/, message: '请输入 3–40 位小写字母或下划线' }]}><Input placeholder="例如 support" /></Form.Item><Form.Item name="name" label="显示名称" rules={[{ required: true }, { max: 80 }]}><Input /></Form.Item></>}
       {modal?.kind === 'reset' && <Form.Item name="password" label="新密码" rules={[{ required: true }, { min: 12, message: '密码至少 12 位' }]}><Input.Password autoComplete="new-password" /></Form.Item>}

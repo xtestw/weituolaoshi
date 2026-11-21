@@ -52,12 +52,19 @@ public class IdentityController {
         String digest=auth.hash(digestKey+":"+number);
         Integer existing=db.queryForObject("SELECT COUNT(*) FROM identity_verification WHERE document_digest=? AND user_id<>?",Integer.class,digest,user);
         if(existing!=null&&existing>0) throw new ApiException(HttpStatus.CONFLICT,"该证件已绑定其他账号");
-        String state="coser".equals(mode)?"pending":"verified";
+        String state="verified";
         String gender=(number.charAt(16)-'0')%2==0?"F":"M";
         db.update("DELETE FROM identity_verification WHERE user_id=?",user);
         db.update("INSERT INTO identity_verification(id,user_id,provider_reference,document_digest,masked_document_number,legal_gender,adult,status,mode,verified_at) VALUES (?,?,?,?,?,?,TRUE,?,?,?)",
             "iv-"+UUID.randomUUID(),user,String.valueOf(result.get("reference")),digest,number.substring(0,3)+"************"+number.substring(15),gender,state,mode,
             "verified".equals(state)?java.sql.Timestamp.valueOf(LocalDateTime.now()):null);
+        if("coser".equals(mode)) {
+            db.update("UPDATE app_user SET role='coser' WHERE id=?",user);
+            Integer profileCount=db.queryForObject("SELECT COUNT(*) FROM coser_profile WHERE user_id=?",Integer.class,user);
+            if(profileCount==null||profileCount==0)
+                db.update("INSERT INTO coser_profile(user_id,display_name,city,verification_status,service_status) SELECT id,COALESCE(nickname,'微信用户'),'','verified','active' FROM app_user WHERE id=?",user);
+            else db.update("UPDATE coser_profile SET verification_status='verified',service_status='active' WHERE user_id=?",user);
+        }
         return status(user);
     }
 }

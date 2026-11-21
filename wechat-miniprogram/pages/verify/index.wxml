@@ -1,5 +1,5 @@
 <view class="page verify-page">
-  <view class="verify-hero"><view class="shield"><view></view></view><text class="verify-hero__title">{{mode === 'coser' ? '完成真人认证' : '确认是你本人'}}</text><text class="muted">{{mode === 'coser' ? '发布前需核验女性身份与成年状态，提交后由平台审核并通过消息通知。' : '用于成年与女性身份下单校验，其他用户不会看到任何证件信息。'}}</text></view>
+  <view class="verify-hero"><view class="shield"><view></view></view><text class="verify-hero__title">{{mode === 'coser' ? '完成真人认证' : '确认是你本人'}}</text><text class="muted">{{mode === 'coser' ? '发布前需核验女性身份与成年状态，核验通过后立即生效，无需人工审核。' : '用于成年与女性身份下单校验，其他用户不会看到任何证件信息。'}}</text></view>
   <view class="section">
     <label class="field-label">真实姓名</label><input class="field" data-field="name" value="{{name}}" bindinput="onField" placeholder="与身份证保持一致" /><text wx:if="{{errors.name}}" class="field-error">{{errors.name}}</text>
     <label class="field-label">身份证号码</label><input class="field" data-field="idNumber" value="{{idNumber}}" bindinput="onField" type="idcard" maxlength="18" placeholder="仅用于平台安全核验" /><text wx:if="{{errors.idNumber}}" class="field-error">{{errors.idNumber}}</text>
