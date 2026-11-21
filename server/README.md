@@ -63,3 +63,15 @@ POST /v1/cosers/me/availability/batch       {"month":"2026-11","type":"weekdays_
 首次启动前设置 `ADMIN_BOOTSTRAP_USER` 和至少 12 位的 `ADMIN_BOOTSTRAP_PASSWORD`；只有管理员表为空时才创建首位超级管理员。访问 `/admin/index.html`。后台同源调用 `/admin/api`，使用独立的 8 小时管理员会话。
 
 内置超级管理员、认证审核员、只读管理员。超级管理员可创建管理员、禁用账号、重置密码、分配角色，新增角色并配置权限；每个接口都在服务端检查权限。认证审核、管理员和角色变更写入审计日志。生产部署应使用 HTTPS，并将后台置于受控访问环境。
+
+### 管理后台前端
+
+管理后台位于 `admin/`，使用 React、Ant Design 和 Vite。修改后台页面后运行：
+
+```bash
+npm ci --prefix admin
+npm run build --prefix admin
+./mvnw spring-boot:run -Dspring-boot.run.profiles=local
+```
+
+Spring Boot 从 `admin/dist` 加载构建后的静态资源，访问 `http://127.0.0.1:18080/admin/index.html`。开发时也可运行 `npm run dev --prefix admin`，Vite 会将 `/admin/api` 代理到本地后端。提交前请一并提交 `admin/dist`，以便仅使用 Maven 的环境也能启动管理后台。
