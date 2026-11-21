@@ -1,6 +1,7 @@
 package com.weituolaoshi.server;
 
 import java.sql.Timestamp;
+import java.nio.file.*;
 import java.time.LocalDateTime;
 import java.util.*;
 import org.springframework.beans.factory.annotation.Value;
@@ -17,10 +18,11 @@ import org.springframework.web.bind.annotation.*;
 public class AdminController {
     private final JdbcTemplate db;
     private final AuthSupport auth;
+    private final MessageSocket messageSocket;
     private final BCryptPasswordEncoder passwords=new BCryptPasswordEncoder();
     @Value("${admin.bootstrap-user:}") private String bootstrapUser;
     @Value("${admin.bootstrap-password:}") private String bootstrapPassword;
-    public AdminController(JdbcTemplate db,AuthSupport auth) { this.db=db; this.auth=auth; }
+    public AdminController(JdbcTemplate db,AuthSupport auth,MessageSocket messageSocket) { this.db=db; this.auth=auth; this.messageSocket=messageSocket; }
     @Bean CommandLineRunner bootstrapAdmin() { return args -> {
         Integer count=db.queryForObject("SELECT COUNT(*) FROM admin_user",Integer.class);
         if(count==0&&!bootstrapUser.isBlank()&&bootstrapPassword.length()>=12) {
@@ -114,14 +116,27 @@ public class AdminController {
     @GetMapping("/messages") public List<Map<String,Object>> messages(@RequestHeader(value="Authorization",required=false) String header) {
         permitted(header,"messages:read"); return db.queryForList("SELECT m.id,m.conversation_id AS \"conversationId\",m.sender_id AS \"senderId\",m.body,m.message_type AS \"type\",m.moderation_status AS \"status\",m.moderation_reason AS \"reason\",m.created_at AS \"createdAt\" FROM chat_message m ORDER BY m.created_at DESC LIMIT 200");
     }
+    @GetMapping("/messages/{id}/image") public org.springframework.http.ResponseEntity<byte[]> messageImage(@RequestHeader(value="Authorization",required=false) String header,@PathVariable String id) throws Exception {
+        permitted(header,"messages:read"); List<Map<String,Object>> rows=db.queryForList("SELECT media_path FROM chat_message WHERE id=? AND message_type='image'",id); if(rows.isEmpty()) throw new ApiException(HttpStatus.NOT_FOUND,"图片不存在");
+        Path path=Paths.get((String)rows.get(0).get("media_path")); String mime=path.toString().endsWith(".png")?"image/png":path.toString().endsWith(".webp")?"image/webp":"image/jpeg"; return org.springframework.http.ResponseEntity.ok().contentType(org.springframework.http.MediaType.parseMediaType(mime)).body(Files.readAllBytes(path));
+    }
     @GetMapping("/message-reports") public List<Map<String,Object>> messageReports(@RequestHeader(value="Authorization",required=false) String header) {
         permitted(header,"messages:read"); return db.queryForList("SELECT r.id,r.message_id AS \"messageId\",r.reporter_id AS \"reporterId\",r.reason,r.status,r.created_at AS \"createdAt\" FROM message_report r ORDER BY r.created_at DESC LIMIT 200");
     }
     @PatchMapping("/messages/{id}") @Transactional public Map<String,Object> moderateMessage(@RequestHeader(value="Authorization",required=false) String header,@PathVariable String id,@RequestBody Map<String,Object> body) {
         String actor=permitted(header,"messages:moderate"), decision=String.valueOf(body.getOrDefault("decision","")), reason=String.valueOf(body.getOrDefault("reason","")).trim();
         if(!List.of("approved","rejected").contains(decision)||reason.length()>300) throw new ApiException(HttpStatus.BAD_REQUEST,"审核参数无效");
-        if(db.update("UPDATE chat_message SET moderation_status=?,moderation_reason=? WHERE id=?",decision,reason,id)==0) throw new ApiException(HttpStatus.NOT_FOUND,"消息不存在");
-        db.update("UPDATE message_report SET status='closed' WHERE message_id=?",id); audit(actor,"message.moderate",id,decision+" "+reason); return Map.of("ok",true);
+        if(db.update("UPDATE chat_message SET moderation_status=?,moderation_reason=?,created_at=CASE WHEN moderation_status='pending' AND ?='approved' THEN CURRENT_TIMESTAMP ELSE created_at END WHERE id=?",decision,reason,decision,id)==0) throw new ApiException(HttpStatus.NOT_FOUND,"消息不存在");
+        db.update("UPDATE message_report SET status='closed' WHERE message_id=?",id); audit(actor,"message.moderate",id,decision+" "+reason);
+        Map<String,Object> c=db.queryForMap("SELECT c.id,c.customer_id,c.coser_id FROM conversation c JOIN chat_message m ON m.conversation_id=c.id WHERE m.id=?",id);
+        org.springframework.transaction.support.TransactionSynchronizationManager.registerSynchronization(new org.springframework.transaction.support.TransactionSynchronization() {
+            @Override public void afterCommit() {
+                String customer=(String)c.get("customer_id"), coser=(String)c.get("coser_id"), conversationId=(String)c.get("id");
+                if(customer!=null) messageSocket.notifyUser(customer,conversationId);
+                if(coser!=null) messageSocket.notifyUser(coser,conversationId);
+            }
+        });
+        return Map.of("ok",true);
     }
     @PatchMapping("/conversations/{id}/restriction") @Transactional public Map<String,Object> restrictConversation(@RequestHeader(value="Authorization",required=false) String header,@PathVariable String id,@RequestBody Map<String,Object> body) {
         String actor=permitted(header,"messages:moderate"),reason=String.valueOf(body.getOrDefault("reason","")).trim(); boolean restricted=Boolean.TRUE.equals(body.get("restricted"));
@@ -129,5 +144,99 @@ public class AdminController {
         if(db.queryForList("SELECT id FROM conversation WHERE id=?",String.class,id).isEmpty()) throw new ApiException(HttpStatus.NOT_FOUND,"会话不存在");
         if(db.update("UPDATE conversation_restriction SET restricted=?,reason=?,updated_at=CURRENT_TIMESTAMP WHERE conversation_id=?",restricted,reason,id)==0) db.update("INSERT INTO conversation_restriction(conversation_id,restricted,reason) VALUES (?,?,?)",id,restricted,reason);
         audit(actor,"conversation.restrict",id,restricted+" "+reason); return Map.of("ok",true);
+    }
+
+    @GetMapping("/official-messages")
+    public List<Map<String,Object>> officialMessages(@RequestHeader(value="Authorization",required=false) String header) {
+        permitted(header,"messages:send");
+        return db.queryForList(
+            "SELECT m.id,m.conversation_id AS \"conversationId\",c.customer_id AS \"userId\",u.nickname," +
+            "m.body,m.created_at AS \"createdAt\" FROM chat_message m " +
+            "JOIN conversation c ON c.id=m.conversation_id AND c.kind='official' " +
+            "JOIN app_user u ON u.id=c.customer_id " +
+            "WHERE m.sender_id='official-platform' ORDER BY m.created_at DESC LIMIT 200");
+    }
+
+    @PostMapping("/official-messages")
+    @Transactional
+    public Map<String,Object> sendOfficialMessage(@RequestHeader(value="Authorization",required=false) String header,
+            @RequestBody Map<String,Object> body) {
+        String actor=permitted(header,"messages:send");
+        String userId=String.valueOf(body.getOrDefault("userId","")).trim();
+        String text=String.valueOf(body.getOrDefault("body","")).trim();
+        if(userId.isBlank()||"official-platform".equals(userId)) throw new ApiException(HttpStatus.BAD_REQUEST,"目标用户无效");
+        if(text.isEmpty()||text.length()>2000) throw new ApiException(HttpStatus.BAD_REQUEST,"请输入2000字以内的文字");
+        List<Map<String,Object>> users=db.queryForList("SELECT id FROM app_user WHERE id=? AND role<>'official'",userId);
+        if(users.isEmpty()) throw new ApiException(HttpStatus.NOT_FOUND,"用户不存在");
+        List<String> existing=db.queryForList("SELECT id FROM conversation WHERE kind='official' AND official_target_id=?",String.class,userId);
+        String conversationId;
+        if(existing.isEmpty()) {
+            conversationId="conv-"+UUID.randomUUID();
+            db.update("INSERT INTO conversation(id,customer_id,coser_id,service_id,order_id,kind,official_target_id) VALUES (?,?,NULL,NULL,NULL,'official',?)",conversationId,userId,userId);
+        } else conversationId=existing.get(0);
+        String messageId=UUID.randomUUID().toString();
+        db.update("INSERT INTO chat_message(id,conversation_id,sender_id,body,moderation_status,message_type) VALUES (?,?,?,?,'approved','text')",
+            messageId,conversationId,"official-platform",text);
+        audit(actor,"official.message.send",userId,conversationId);
+        String notifyUserId=userId, notifyConversationId=conversationId;
+        org.springframework.transaction.support.TransactionSynchronizationManager.registerSynchronization(
+            new org.springframework.transaction.support.TransactionSynchronization() {
+                @Override public void afterCommit() { messageSocket.notifyUser(notifyUserId,notifyConversationId); }
+            });
+        return Map.of("id",messageId,"conversationId",conversationId,"userId",userId);
+    }
+
+    @GetMapping("/order-exceptions")
+    public List<Map<String,Object>> orderExceptions(@RequestHeader(value="Authorization",required=false) String header) {
+        permitted(header,"orders:read");
+        return db.queryForList("SELECT e.id,e.order_id AS \"orderId\",o.coser_id AS \"coserId\",o.customer_id AS \"customerId\"," +
+            "o.service_title_snapshot AS \"title\",e.reason,e.status,e.responsible_party AS \"responsibleParty\"," +
+            "e.fulfillment_incomplete AS \"fulfillmentIncomplete\",e.review_note AS \"reviewNote\"," +
+            "e.created_at AS \"createdAt\",e.reviewed_at AS \"reviewedAt\" FROM order_exception e " +
+            "JOIN booking_order o ON o.id=e.order_id ORDER BY e.created_at DESC LIMIT 200");
+    }
+
+    @PatchMapping("/order-exceptions/{id}")
+    @Transactional
+    public Map<String,Object> reviewException(@RequestHeader(value="Authorization",required=false) String header,
+            @PathVariable String id,@RequestBody Map<String,Object> body) {
+        String actor=permitted(header,"orders:review");
+        String decision=String.valueOf(body.getOrDefault("decision","")).trim();
+        String party=String.valueOf(body.getOrDefault("responsibleParty","")).trim();
+        String note=String.valueOf(body.getOrDefault("reviewNote","")).trim();
+        boolean incomplete=Boolean.TRUE.equals(body.get("fulfillmentIncomplete"));
+        if(!List.of("approved","rejected","closed").contains(decision)) throw new ApiException(HttpStatus.BAD_REQUEST,"审核结论无效");
+        if("approved".equals(decision) && !List.of("coser","customer","none","both").contains(party))
+            throw new ApiException(HttpStatus.BAD_REQUEST,"责任方无效");
+        if(!"approved".equals(decision)) { party=null; incomplete=false; }
+        if(note.length()>500) throw new ApiException(HttpStatus.BAD_REQUEST,"审核备注过长");
+        if(db.update("UPDATE order_exception SET status=?,responsible_party=?,fulfillment_incomplete=?,review_note=?," +
+            "reviewed_at=CURRENT_TIMESTAMP,reviewed_by=? WHERE id=? AND status='pending'",
+            decision,party,incomplete,note,actor,id)==0)
+            throw new ApiException(HttpStatus.CONFLICT,"异常工单不存在或已审核");
+        audit(actor,"order.exception.review",id,decision+" "+party);
+        return Map.of("ok",true);
+    }
+
+    @GetMapping("/support-tickets")
+    public List<Map<String,Object>> supportTickets(@RequestHeader(value="Authorization",required=false) String header) {
+        permitted(header,"support:read");
+        return db.queryForList("SELECT t.id,t.requester_id AS \"requesterId\",t.role_snapshot AS \"role\",t.category," +
+            "t.subject,t.body,t.order_id AS \"orderId\",t.status,t.created_at AS \"createdAt\" " +
+            "FROM support_ticket t ORDER BY t.created_at DESC LIMIT 200");
+    }
+
+    @PatchMapping("/support-tickets/{id}")
+    @Transactional
+    public Map<String,Object> updateSupportTicket(@RequestHeader(value="Authorization",required=false) String header,
+            @PathVariable String id,@RequestBody Map<String,Object> body) {
+        String actor=permitted(header,"support:write");
+        String status=String.valueOf(body.getOrDefault("status","")).trim();
+        if(!List.of("open","in_progress","resolved","closed").contains(status))
+            throw new ApiException(HttpStatus.BAD_REQUEST,"工单状态无效");
+        if(db.update("UPDATE support_ticket SET status=?,updated_at=CURRENT_TIMESTAMP WHERE id=?",status,id)==0)
+            throw new ApiException(HttpStatus.NOT_FOUND,"工单不存在");
+        audit(actor,"support.ticket.update",id,status);
+        return Map.of("ok",true);
     }
 }

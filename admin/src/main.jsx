@@ -1,12 +1,13 @@
 import React, { useEffect, useState } from 'react'
 import { createRoot } from 'react-dom/client'
 import { ConfigProvider, Layout, Menu, Card, Form, Input, Button, Table, Tag, Space, Typography, Alert, Modal, Select, Switch, Checkbox, message, Grid, Drawer, Empty } from 'antd'
-import { SafetyCertificateOutlined, TeamOutlined, UserOutlined, KeyOutlined, AuditOutlined, LogoutOutlined, MenuOutlined, CheckCircleOutlined } from '@ant-design/icons'
+import { SafetyCertificateOutlined, TeamOutlined, UserOutlined, KeyOutlined, AuditOutlined, LogoutOutlined, MenuOutlined, CheckCircleOutlined, MailOutlined } from '@ant-design/icons'
 import 'antd/dist/reset.css'
 import './style.css'
 
 const { Sider, Header, Content } = Layout
 const { Text, Title } = Typography
+const { TextArea } = Input
 const api = async (path, options = {}) => {
   const token = sessionStorage.getItem('admin_token')
   const response = await fetch('/admin/api' + path, { ...options, headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}), ...options.headers } })
@@ -21,24 +22,39 @@ const statusLabel = status => ({ verified: '已通过', pending: '待审核', re
 const navItems = [
   { key: 'identities', icon: <SafetyCertificateOutlined />, label: '实名认证', permission: 'identity:read' },
   { key: 'users', icon: <TeamOutlined />, label: '用户管理', permission: 'users:read' },
+  { key: 'official-messages', icon: <MailOutlined />, label: '官号私信', permission: 'messages:send' },
   { key: 'admins', icon: <UserOutlined />, label: '管理员', permission: 'admins:read' },
   { key: 'roles', icon: <KeyOutlined />, label: '角色权限', permission: 'admins:read' },
-  { key: 'audit', icon: <AuditOutlined />, label: '审计日志', permission: 'audit:read' }
+  { key: 'audit', icon: <AuditOutlined />, label: '审计日志', permission: 'audit:read' },
+  { key: 'messages', icon: <AuditOutlined />, label: '消息审核', permission: 'messages:read' },
+  { key: 'message-reports', icon: <AuditOutlined />, label: '消息举报', permission: 'messages:read' }
 ]
+const captions = {
+  identities: '查看自动核验结果与脱敏证件信息',
+  users: '查看平台用户信息',
+  'official-messages': '以「委托助手」官号向指定用户发送私信',
+  admins: '管理后台账号及角色',
+  roles: '配置各角色可使用的功能',
+  audit: '查看管理员操作记录',
+  messages: '审核用户消息',
+  'message-reports': '处理消息举报'
+}
 function App() {
   const [profile, setProfile] = useState(null)
   const [loading, setLoading] = useState(true)
   const [tab, setTab] = useState('identities')
   const [drawer, setDrawer] = useState(false)
   const [notice, setNotice] = useState('')
+  const [officialDraft, setOfficialDraft] = useState('')
   const screens = Grid.useBreakpoint()
   const can = permission => profile?.permissions?.includes(permission)
   const available = navItems.filter(item => can(item.permission))
   useEffect(() => { if (sessionStorage.getItem('admin_token')) api('/me').then(setProfile).catch(() => sessionStorage.removeItem('admin_token')).finally(() => setLoading(false)); else setLoading(false) }, [])
   useEffect(() => { if (profile && !available.some(item => item.key === tab)) setTab(available[0]?.key || '') }, [profile, tab])
   const login = async values => { try { const result = await send('/login', 'POST', values); sessionStorage.setItem('admin_token', result.token); setProfile(result.profile); message.success('登录成功') } catch (error) { message.error(error.message) } }
-  const logout = async () => { try { await api('/logout', { method: 'POST' }) } catch {} sessionStorage.removeItem('admin_token'); setProfile(null); setTab('identities') }
-  const choose = key => { setTab(key); setDrawer(false); setNotice('') }
+  const logout = async () => { try { await api('/logout', { method: 'POST' }) } catch {} sessionStorage.removeItem('admin_token'); setProfile(null); setTab('identities'); setOfficialDraft('') }
+  const choose = key => { setTab(key); setDrawer(false); setNotice(''); if (key !== 'official-messages') setOfficialDraft('') }
+  const openOfficial = userId => { setOfficialDraft(userId); setTab('official-messages'); setDrawer(false); setNotice('') }
   const menu = <Menu theme="dark" mode="inline" selectedKeys={[tab]} items={available.map(({ key, icon, label }) => ({ key, icon, label }))} onClick={({ key }) => choose(key)} />
   if (loading) return null
   if (!profile) return <div className="login-page"><Card className="login-card"><Space direction="vertical" size={4} style={{ marginBottom: 28 }}><SafetyCertificateOutlined style={{ fontSize: 32, color: '#1677ff' }} /><Title level={3} style={{ margin: '12px 0 0' }}>次元委托管理后台</Title><Text type="secondary">请使用管理员账号登录</Text></Space><Form layout="vertical" onFinish={login} size="large"><Form.Item name="username" label="用户名" rules={[{ required: true, message: '请输入用户名' }]}><Input autoComplete="username" /></Form.Item><Form.Item name="password" label="密码" rules={[{ required: true, message: '请输入密码' }]}><Input.Password autoComplete="current-password" /></Form.Item><Button type="primary" htmlType="submit" block>登录</Button></Form></Card></div>
@@ -46,20 +62,32 @@ function App() {
   return <Layout className="app-shell">
     {screens.md ? <Sider width={230} className="app-sider" theme="dark"><div className="sider-brand"><div className="brand">次元委托</div><div className="brand-sub">管理后台</div></div>{menu}</Sider> : <Drawer title="次元委托 · 管理后台" placement="left" width={230} open={drawer} onClose={() => setDrawer(false)} styles={{ body: { padding: 0, background: '#001529' } }}>{menu}</Drawer>}
     <Layout><Header className="app-header"><Space>{!screens.md && <Button className="mobile-trigger" type="text" icon={<MenuOutlined />} onClick={() => setDrawer(true)} />}<Text strong>{current?.label || '工作台'}</Text></Space><div className="header-user"><Text className="username">{profile.username}</Text><Tag color="blue">{profile.roles?.join('、')}</Tag><Button type="text" icon={<LogoutOutlined />} onClick={logout}>退出</Button></div></Header>
-      <Content className="app-content"><h1 className="page-title">{current?.label || '工作台'}</h1><p className="page-caption">{({ identities: '查看自动核验结果与脱敏证件信息', users: '查看平台用户信息', admins: '管理后台账号及角色', roles: '配置各角色可使用的功能', audit: '查看管理员操作记录' })[tab]}</p>{notice && <Alert type="error" showIcon closable message={notice} onClose={() => setNotice('')} style={{ marginBottom: 16 }} />}{!tab ? <Empty description="当前账号没有可用菜单" /> : <Page key={tab} tab={tab} profile={profile} setProfile={setProfile} setNotice={setNotice} />}</Content>
+      <Content className="app-content"><h1 className="page-title">{current?.label || '工作台'}</h1><p className="page-caption">{captions[tab]}</p>{notice && <Alert type="error" showIcon closable message={notice} onClose={() => setNotice('')} style={{ marginBottom: 16 }} />}{!tab ? <Empty description="当前账号没有可用菜单" /> : <Page key={tab} tab={tab} profile={profile} setProfile={setProfile} setNotice={setNotice} officialDraft={officialDraft} onOpenOfficial={openOfficial} canSendOfficial={can('messages:send')} />}</Content>
     </Layout>
   </Layout>
 }
-function Page({ tab, profile, setProfile, setNotice }) {
+function Page({ tab, profile, setProfile, setNotice, officialDraft, onOpenOfficial, canSendOfficial }) {
   const [rows, setRows] = useState([])
   const [roles, setRoles] = useState([])
   const [permissions, setPermissions] = useState([])
   const [loading, setLoading] = useState(true)
   const [modal, setModal] = useState(null)
+  const [sending, setSending] = useState(false)
   const [form] = Form.useForm()
-  const canWrite = tab !== 'identities' && profile.permissions.includes('admins:write')
-  const load = async () => { setLoading(true); try { if (tab === 'admins') { const [a, b] = await Promise.all([api('/admins'), api('/roles')]); setRows(a); setRoles(b) } else if (tab === 'roles') { const [a, b] = await Promise.all([api('/roles'), api('/permissions')]); setRows(a); setPermissions(b) } else setRows(await api('/' + tab)) } catch (error) { setNotice(error.message) } finally { setLoading(false) } }
+  const [officialForm] = Form.useForm()
+  const canWrite = tab !== 'identities' && profile.permissions.includes(tab === 'messages' || tab === 'message-reports' ? 'messages:moderate' : 'admins:write')
+  const load = async () => {
+    setLoading(true)
+    try {
+      if (tab === 'admins') { const [a, b] = await Promise.all([api('/admins'), api('/roles')]); setRows(a); setRoles(b) }
+      else if (tab === 'roles') { const [a, b] = await Promise.all([api('/roles'), api('/permissions')]); setRows(a); setPermissions(b) }
+      else setRows(await api('/' + tab))
+    } catch (error) { setNotice(error.message) } finally { setLoading(false) }
+  }
   useEffect(() => { load() }, [tab])
+  useEffect(() => {
+    if (tab === 'official-messages') officialForm.setFieldsValue({ userId: officialDraft || undefined, body: undefined })
+  }, [tab, officialDraft])
   const success = async text => { message.success(text); setModal(null); form.resetFields(); await load() }
   const fail = error => message.error(error.message)
   const submitModal = async values => {
@@ -71,7 +99,19 @@ function Page({ tab, profile, setProfile, setNotice }) {
     } catch (error) { fail(error) }
   }
   const changeAdmin = async (row, values) => { try { await send('/admins/' + encodeURIComponent(row.id), 'PATCH', values); await success('管理员已更新') } catch (error) { fail(error) } }
+  const moderate = async (row, decision) => { try { await send('/messages/' + encodeURIComponent(row.messageId || row.id), 'PATCH', { decision }); await success('消息已处置') } catch (error) { fail(error) } }
+  const restrict = async row => { try { await send('/conversations/' + encodeURIComponent(row.conversationId) + '/restriction', 'PATCH', { restricted: true, reason: '管理员限制' }); await success('会话已限制') } catch (error) { fail(error) } }
+  const viewImage = async row => { try { const response = await fetch('/admin/api/messages/' + encodeURIComponent(row.id) + '/image', { headers: { Authorization: `Bearer ${sessionStorage.getItem('admin_token')}` } }); if (!response.ok) throw new Error('图片加载失败'); const url = URL.createObjectURL(await response.blob()); window.open(url, '_blank'); setTimeout(() => URL.revokeObjectURL(url), 60000) } catch (error) { fail(error) } }
   const savePermissions = async (role, selected) => { try { await send('/roles/' + encodeURIComponent(role.id) + '/permissions', 'PUT', { permissions: selected }); message.success('权限已保存'); const p = await api('/me'); setProfile(p); await load() } catch (error) { fail(error) } }
+  const sendOfficial = async values => {
+    setSending(true)
+    try {
+      await send('/official-messages', 'POST', values)
+      message.success('私信已发送')
+      officialForm.setFieldsValue({ body: undefined })
+      await load()
+    } catch (error) { fail(error) } finally { setSending(false) }
+  }
   const columns = {
     identities: [
       { title: '用户', dataIndex: 'nickname', render: (value, row) => <div className="user-cell">{value || '未设置昵称'}<small title={row.userId}>{row.userId}</small></div> },
@@ -81,9 +121,37 @@ function Page({ tab, profile, setProfile, setNotice }) {
       { title: '原因', dataIndex: 'reason', render: value => value || '—' },
       { title: '提交时间', dataIndex: 'createdAt', render: fmt },
     ],
-    users: [{ title: '用户 ID', dataIndex: 'id' }, { title: '昵称', dataIndex: 'nickname', render: v => v || '—' }, { title: '角色', dataIndex: 'role' }, { title: '注册时间', dataIndex: 'createdAt', render: fmt }],
+    users: [
+      { title: '用户 ID', dataIndex: 'id' },
+      { title: '昵称', dataIndex: 'nickname', render: v => v || '—' },
+      { title: '角色', dataIndex: 'role' },
+      { title: '注册时间', dataIndex: 'createdAt', render: fmt },
+      { title: '操作', key: 'actions', render: (_, row) => canSendOfficial && row.role !== 'official' ? <Button size="small" onClick={() => onOpenOfficial(row.id)}>发私信</Button> : '—' }
+    ],
+    'official-messages': [
+      { title: '时间', dataIndex: 'createdAt', render: fmt },
+      { title: '用户', render: (_, row) => <div className="user-cell">{row.nickname || '未设置昵称'}<small title={row.userId}>{row.userId}</small></div> },
+      { title: '内容', dataIndex: 'body' },
+      { title: '会话', dataIndex: 'conversationId' }
+    ],
     admins: [{ title: '用户名', dataIndex: 'username' }, { title: '状态', dataIndex: 'enabled', render: v => <Tag color={v ? 'success' : 'default'}>{v ? '启用' : '禁用'}</Tag> }, { title: '操作', key: 'actions', render: (_, row) => canWrite && row.id !== profile.id ? <Space wrap><Select size="small" placeholder="修改角色" style={{ width: 125 }} options={roles.map(r => ({ value: r.id, label: r.name }))} onChange={role => changeAdmin(row, { role })} /><Switch size="small" checked={row.enabled} onChange={enabled => changeAdmin(row, { enabled })} /><Button size="small" onClick={() => { form.resetFields(); setModal({ kind: 'reset', row }) }}>重置密码</Button></Space> : '—' }],
-    audit: [{ title: '时间', dataIndex: 'createdAt', render: fmt }, { title: '操作人', dataIndex: 'username' }, { title: '动作', dataIndex: 'action' }, { title: '目标', dataIndex: 'targetId' }, { title: '详情', dataIndex: 'detail', render: v => v || '—' }]
+    audit: [{ title: '时间', dataIndex: 'createdAt', render: fmt }, { title: '操作人', dataIndex: 'username' }, { title: '动作', dataIndex: 'action' }, { title: '目标', dataIndex: 'targetId' }, { title: '详情', dataIndex: 'detail', render: v => v || '—' }],
+    messages: [{ title: '时间', dataIndex: 'createdAt', render: fmt }, { title: '发送者', dataIndex: 'senderId' }, { title: '内容', render: (_, row) => row.type === 'image' ? <Button size="small" onClick={() => viewImage(row)}>查看图片</Button> : row.body }, { title: '状态', dataIndex: 'status' }, { title: '会话', dataIndex: 'conversationId' }, { title: '操作', render: (_, row) => canWrite ? <Space><Button size="small" onClick={() => moderate(row, 'approved')}>通过</Button><Button size="small" danger onClick={() => moderate(row, 'rejected')}>驳回</Button><Button size="small" onClick={() => restrict(row)}>限制会话</Button></Space> : '—' }],
+    'message-reports': [{ title: '时间', dataIndex: 'createdAt', render: fmt }, { title: '消息', dataIndex: 'messageId' }, { title: '举报人', dataIndex: 'reporterId' }, { title: '原因', dataIndex: 'reason' }, { title: '状态', dataIndex: 'status' }, { title: '操作', render: (_, row) => canWrite ? <Space><Button size="small" onClick={() => moderate(row, 'approved')}>保留消息</Button><Button size="small" danger onClick={() => moderate(row, 'rejected')}>移除消息</Button></Space> : '—' }]
+  }
+  if (tab === 'official-messages') {
+    return <>
+      <Card className="content-card" style={{ marginBottom: 16 }} title="发送官号私信">
+        <Form form={officialForm} layout="vertical" onFinish={sendOfficial} initialValues={{ userId: officialDraft || undefined }}>
+          <Form.Item name="userId" label="目标用户 ID" rules={[{ required: true, message: '请输入用户 ID' }]}><Input placeholder="例如 demo-customer" /></Form.Item>
+          <Form.Item name="body" label="消息内容" rules={[{ required: true, message: '请输入内容' }, { max: 2000, message: '最多 2000 字' }]}><TextArea rows={4} showCount maxLength={2000} placeholder="将以「委托助手」名义发送" /></Form.Item>
+          <Button type="primary" htmlType="submit" loading={sending}>发送</Button>
+        </Form>
+      </Card>
+      <Card className="content-card" title="最近发送">
+        <div className="table-scroll"><Table rowKey="id" loading={loading} dataSource={rows} columns={columns['official-messages']} pagination={{ pageSize: 10, showSizeChanger: false }} /></div>
+      </Card>
+    </>
   }
   return <>
     {tab === 'roles' ? <>{canWrite && <Button type="primary" style={{ marginBottom: 16 }} onClick={() => { form.resetFields(); setModal({ kind: 'role' }) }}>新建角色</Button>}{rows.map(role => <RoleCard key={role.id} role={role} permissions={permissions} canWrite={canWrite} onSave={savePermissions} />)}</> : <Card className="content-card" extra={tab === 'admins' && canWrite ? <Button type="primary" onClick={() => { form.resetFields(); setModal({ kind: 'admin' }) }}>新建管理员</Button> : null}><div className="table-scroll"><Table rowKey={row => row.id || `${row.createdAt}-${row.action}-${row.targetId}`} loading={loading} dataSource={rows} columns={columns[tab]} pagination={{ pageSize: 10, showSizeChanger: false }} /></div></Card>}

@@ -1,0 +1,10 @@
+ALTER TABLE chat_message ADD COLUMN client_id VARCHAR(80);
+ALTER TABLE chat_message ADD COLUMN message_type VARCHAR(20) DEFAULT 'text' NOT NULL;
+ALTER TABLE chat_message ADD COLUMN media_path VARCHAR(512);
+ALTER TABLE chat_message ADD COLUMN moderation_reason VARCHAR(300);
+CREATE UNIQUE INDEX uq_chat_client_id ON chat_message(conversation_id,sender_id,client_id);
+CREATE TABLE conversation_read (conversation_id VARCHAR(64) NOT NULL REFERENCES conversation(id), user_id VARCHAR(64) NOT NULL REFERENCES app_user(id), last_read_at TIMESTAMP NOT NULL, PRIMARY KEY(conversation_id,user_id));
+CREATE TABLE message_report (id VARCHAR(64) PRIMARY KEY, message_id VARCHAR(64) NOT NULL REFERENCES chat_message(id), reporter_id VARCHAR(64) NOT NULL REFERENCES app_user(id), reason VARCHAR(300) NOT NULL, status VARCHAR(20) DEFAULT 'open' NOT NULL, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL, UNIQUE(message_id,reporter_id));
+CREATE TABLE conversation_restriction (conversation_id VARCHAR(64) PRIMARY KEY REFERENCES conversation(id), restricted BOOLEAN DEFAULT FALSE NOT NULL, reason VARCHAR(300), updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL);
+INSERT INTO admin_permission VALUES ('messages:read','查看消息与举报'),('messages:moderate','处置消息与会话');
+INSERT INTO admin_role_permission VALUES ('super_admin','messages:read'),('super_admin','messages:moderate'),('reviewer','messages:read'),('reviewer','messages:moderate');
