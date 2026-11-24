@@ -1,0 +1,15 @@
+{
+  "name": "次元委托",
+  "appid": "__UNI__CIYUANCOMMISSION",
+  "versionName": "1.0.0",
+  "versionCode": "100",
+  "transformPx": false,
+  "mp-weixin": {
+    "appid": "wx2a40389a906e9916",
+    "setting": {
+      "urlCheck": false,
+      "es6": true,
+      "ignoreDevUnusedFiles": false
+    }
+  }
+}

@@ -1,0 +1,13 @@
+<view class="profile-edit-page">
+  <view class="profile-card profile-avatar-row">
+    <view><text class="profile-row-title">头像</text><text class="profile-row-hint">点击右侧头像更换</text></view>
+    <button class="profile-avatar-picker" open-type="chooseAvatar" bindchooseavatar="onChooseAvatar" aria-label="选择头像"><image wx:if="{{draftAvatar || accountAvatar}}" src="{{draftAvatar || accountAvatar}}" mode="aspectFill"/><text wx:else>{{accountInitial}}</text></button>
+  </view>
+  <view class="profile-card profile-fields">
+    <view class="profile-field-row"><text class="profile-row-title">昵称</text><input type="nickname" value="{{draftNickname}}" maxlength="30" bindinput="onNickname" placeholder="填写昵称"/></view>
+    <view class="profile-field-row"><view><text class="profile-row-title">手机号</text><text class="profile-row-hint">未验证 · 选填</text></view><input type="number" value="{{draftPhone}}" maxlength="11" bindinput="onPhone" placeholder="填写手机号"/></view>
+    <view class="profile-bio-row"><text class="profile-row-title">个人简介</text><textarea value="{{draftBio}}" maxlength="500" bindinput="onBio" placeholder="介绍一下自己（选填）"/></view>
+  </view>
+  <text wx:if="{{authError}}" class="profile-edit-error">{{authError}}</text>
+  <view class="profile-save-area"><button class="profile-save-button" loading="{{profileSaving}}" disabled="{{profileSaving}}" bindtap="saveProfile">保存资料</button></view>
+</view>

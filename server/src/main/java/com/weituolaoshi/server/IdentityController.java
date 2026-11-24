@@ -25,11 +25,38 @@ public class IdentityController {
     @Value("${faceid.rule-id:}") private String ruleId;
     @Value("${faceid.region:ap-guangzhou}") private String region;
     @Value("${identity.digest-key:}") private String digestKey;
-    public IdentityController(JdbcTemplate db,AuthSupport auth) { this.db=db; this.auth=auth; }
+    @Value("${identity.face-check-whitelist:}") private String faceWhitelist;
+    private final IdentityGenderPolicy genderPolicy;
+    public IdentityController(JdbcTemplate db,AuthSupport auth,IdentityGenderPolicy genderPolicy) {
+        this.db=db; this.auth=auth; this.genderPolicy=genderPolicy;
+    }
+
+    private boolean faceAllowed(String number) {
+        return (!digestKey.isBlank() && db.queryForObject("SELECT COUNT(*) FROM identity_test_whitelist WHERE document_digest=?",Integer.class,auth.hash(digestKey+":"+number))>0) || Arrays.stream(faceWhitelist.split(","))
+            .map(s -> s.trim().toUpperCase(Locale.ROOT)).anyMatch(number::equals);
+    }
+
+    @PostMapping("/verifications") @Transactional
+    public Map<String,Object> verify(@RequestHeader(value="Authorization",required=false) String header,
+            @RequestBody Map<String,Object> body) {
+        String user=auth.user(header), number=number(body);
+        validate(name(body),number,body);
+        if (!faceAllowed(number)) throw new ApiException(HttpStatus.FORBIDDEN,"该账号证件不在测试白名单，请使用人脸核身");
+        return verifyTest(user,number,mode(body));
+    }
+
+    private Map<String,Object> verifyTest(String user,String number,String mode) {
+        Map<String,Object> result=new HashMap<>(saveIdentity(user,number,mode,"test-face-whitelist:"+UUID.randomUUID()));
+        result.put("faceBypassed",true);
+        return result;
+    }
 
     private Map<String,Object> status(String user) {
         List<Map<String,Object>> rows=db.queryForList("SELECT status,mode,adult,legal_gender AS \"gender\",masked_document_number AS \"maskedId\",review_reason AS \"reason\" FROM identity_verification WHERE user_id=?",user);
-        return rows.isEmpty()?Map.of("status","unverified"):rows.get(0);
+        Map<String,Object> result=rows.isEmpty()?new HashMap<>(Map.of("status","unverified")):new HashMap<>(rows.get(0));
+        List<String> coserStatuses=db.queryForList("SELECT verification_status FROM coser_profile WHERE user_id=?",String.class,user);
+        result.put("coserStatus",coserStatuses.isEmpty()?"unverified":coserStatuses.get(0));
+        return result;
     }
     @GetMapping("/me") public Map<String,Object> me(@RequestHeader(value="Authorization",required=false) String header) { return status(auth.user(header)); }
     private FaceidClient client() {
@@ -50,9 +77,10 @@ public class IdentityController {
         try { LocalDate.parse(number.substring(6,14),DateTimeFormatter.BASIC_ISO_DATE); }
         catch(Exception ex) { throw new ApiException(HttpStatus.BAD_REQUEST,"出生日期无效"); }
     }
-    @PostMapping("/face/start") public Map<String,Object> start(@RequestHeader(value="Authorization",required=false) String header,@RequestBody Map<String,Object> body) {
+    @PostMapping("/face/start") @Transactional public Map<String,Object> start(@RequestHeader(value="Authorization",required=false) String header,@RequestBody Map<String,Object> body) {
         String user=auth.user(header), name=name(body), number=number(body), mode=mode(body);
         validate(name,number,body);
+        if (faceAllowed(number)) return verifyTest(user,number,mode);
         try {
             DetectAuthRequest request=new DetectAuthRequest(); request.setRuleId(ruleId); request.setName(name); request.setIdCard(number);
             DetectAuthResponse response=client().DetectAuth(request);
@@ -78,18 +106,25 @@ public class IdentityController {
         if(result==null||result.getErrCode()==null||result.getErrCode()!=0L) throw new ApiException(HttpStatus.UNPROCESSABLE_ENTITY,"人脸核身未通过");
         String name=result.getName(), number=result.getIdCard()==null?"":result.getIdCard().toUpperCase(Locale.ROOT);
         validate(name,number,Map.of("agreed",true));
+        int consumed=db.update("UPDATE face_verification_attempt SET consumed_at=CURRENT_TIMESTAMP WHERE token_hash=? AND user_id=? AND consumed_at IS NULL",auth.hash(bizToken),user);
+        if(consumed!=1) throw new ApiException(HttpStatus.CONFLICT,"核身结果已使用");
+        return saveIdentity(user,number,mode,response.getRequestId());
+    }
+
+    private Map<String,Object> saveIdentity(String user,String number,String mode,String reference) {
+        if (digestKey.isBlank()) throw new ApiException(HttpStatus.SERVICE_UNAVAILABLE,"实名认证摘要密钥尚未配置");
+        // Serialize repeated verification for a user; document uniqueness is enforced by the database.
+        db.queryForObject("SELECT id FROM app_user WHERE id=? FOR UPDATE",String.class,user);
         LocalDate birth=LocalDate.parse(number.substring(6,14),DateTimeFormatter.BASIC_ISO_DATE);
         if(birth.plusYears(18).isAfter(LocalDate.now(SHANGHAI))) throw new ApiException(HttpStatus.FORBIDDEN,"未满18周岁不能认证");
         String gender=(number.charAt(16)-'0')%2==0?"F":"M";
-        if("coser".equals(mode)&&!"F".equals(gender)) throw new ApiException(HttpStatus.FORBIDDEN,"仅成年女性可申请Coser认证");
+        if("coser".equals(mode)&&!genderPolicy.allowsNumber(gender,number)) throw new ApiException(HttpStatus.FORBIDDEN,"仅成年女性可申请Coser认证");
         String digest=auth.hash(digestKey+":"+number);
         Integer existing=db.queryForObject("SELECT COUNT(*) FROM identity_verification WHERE document_digest=? AND user_id<>?",Integer.class,digest,user);
         if(existing!=null&&existing>0) throw new ApiException(HttpStatus.CONFLICT,"该证件已绑定其他账号");
-        int consumed=db.update("UPDATE face_verification_attempt SET consumed_at=CURRENT_TIMESTAMP WHERE token_hash=? AND user_id=? AND consumed_at IS NULL",auth.hash(bizToken),user);
-        if(consumed!=1) throw new ApiException(HttpStatus.CONFLICT,"核身结果已使用");
         db.update("DELETE FROM identity_verification WHERE user_id=?",user);
         db.update("INSERT INTO identity_verification(id,user_id,provider_reference,document_digest,masked_document_number,legal_gender,adult,status,mode,verified_at) VALUES (?,?,?,?,?,?,TRUE,'verified',?,CURRENT_TIMESTAMP)",
-            "iv-"+UUID.randomUUID(),user,response.getRequestId(),digest,number.substring(0,3)+"************"+number.substring(15),gender,mode);
+            "iv-"+UUID.randomUUID(),user,reference,digest,number.substring(0,3)+"************"+number.substring(15),gender,mode);
         if("coser".equals(mode)) {
             db.update("UPDATE app_user SET role='coser' WHERE id=?",user);
             Integer count=db.queryForObject("SELECT COUNT(*) FROM coser_profile WHERE user_id=?",Integer.class,user);

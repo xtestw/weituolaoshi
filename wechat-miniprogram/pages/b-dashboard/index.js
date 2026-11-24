@@ -17,7 +17,7 @@ Page({
   switchCustomer() { wx.switchTab({ url: '/pages/home/index' }) },
   callEmergencyContact,
   openException() { wx.showActionSheet({ itemList: ['用户未到场', '地点存在安全风险', '用户需求超出边界', '取消责任争议', '其他异常'], success: () => wx.showToast({ title: '已创建安全工单', icon: 'none' }) }) },
-  contact() { wx.navigateTo({ url: '/pages/chat/index?name=%E5%B0%8F%E9%B1%BC' }) },
+  contact() { wx.switchTab({ url: '/pages/messages/index' }) },
   reject() { wx.showActionSheet({ itemList: ['身体不适无法履约', '档期冲突', '服装或道具异常', '需求超出服务边界', '其他原因'], success: ({ tapIndex }) => {
     const reasons = ['身体不适无法履约', '档期冲突', '服装或道具异常', '需求超出服务边界', '其他原因']
     const cases = get('responsibilityCases', [])

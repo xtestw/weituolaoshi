@@ -1,0 +1,1 @@
+<view class="page" wx:if="{{post}}"><text class="kind">普通用户 · 社区帖</text><view class="title">{{post.title}}</view><text class="author">{{post.author || '用户'}} · {{post.createdAt}}</text><view class="body">{{post.body}}</view></view>

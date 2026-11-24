@@ -10,7 +10,7 @@
   >
     <image wx:if="{{selected === index}}" class="tab__icon-image" src="/assets/tab-icons/{{item.type}}.png" mode="aspectFit" aria-hidden="true" />
     <image wx:else class="tab__icon-image" src="/assets/tab-icons/{{item.type}}-outline.png" mode="aspectFit" aria-hidden="true" />
-    <view wx:if="{{item.type === 'message'}}" class="tab__dot" aria-hidden="true"></view>
+    <view wx:if="{{item.type === 'message' && unread > 0}}" class="tab__dot" aria-hidden="true"></view>
     <text>{{item.text}}</text>
   </button>
 </view>

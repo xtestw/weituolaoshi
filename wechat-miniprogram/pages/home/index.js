@@ -1,6 +1,7 @@
 const { services, loadCatalog } = require('../../utils/services')
 const { CITIES } = require('../../utils/cities')
 const { get, set } = require('../../utils/store')
+const { request } = require('../../services/api')
 
 function buildCalendarDays() {
   const now = new Date()
@@ -24,6 +25,7 @@ Page({
     cities: CITIES,
     cityPickerOpen: false,
     keyword: '',
+    communityPosts: [],
     activeFeed: 'recommend',
     dateLabel: '日历可约',
     calendarOpen: false,
@@ -47,8 +49,11 @@ Page({
     const city = get('currentCity', '上海')
     if (city !== this.data.city) this.setData({ city }, () => this.applyFeed(this.data.activeFeed))
     loadCatalog().then(() => this.applyFeed(this.data.activeFeed)).catch(() => this.setData({ catalogError: true }))
+    request('/v1/posts').then(communityPosts => this.setData({ communityPosts })).catch(() => this.setData({ communityPosts: [] }))
     this.showWomenOnlyNotice()
   },
+  openCommunity(e) { wx.navigateTo({ url: `/pages/community-detail/index?id=${e.currentTarget.dataset.id}` }) },
+  openMyPosts() { if (!wx.getStorageSync('account_token')) return wx.switchTab({ url: '/pages/profile/index' }); wx.navigateTo({ url: '/pages/community-mine/index' }) },
   showWomenOnlyNotice() {
     let did = wx.getStorageSync('coser_v1_local_did')
     if (!did) {

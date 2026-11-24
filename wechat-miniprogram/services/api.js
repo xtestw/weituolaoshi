@@ -81,4 +81,18 @@ function uploadAvatar(filePath) {
     fail: reject
   }))
 }
-module.exports = { request, createPayment, startFaceIdentity, completeFaceIdentity, wechatLogin, currentUser, logout, clearAccount, uploadAvatar }
+function uploadServiceImage(serviceId, filePath) {
+  const base = app().globalData.apiBaseUrl
+  const token = wx.getStorageSync('account_token')
+  if (!base || !token) return Promise.reject(new Error('请先登录'))
+  return new Promise((resolve, reject) => wx.uploadFile({
+    url: `${base}/v1/services/${encodeURIComponent(serviceId)}/images`, filePath, name: 'file',
+    header: { Authorization: `Bearer ${token}` },
+    success: ({ statusCode, data }) => {
+      let parsed = {}
+      try { parsed = JSON.parse(data) } catch (_) {}
+      statusCode >= 200 && statusCode < 300 ? resolve(parsed) : reject(new Error(parsed.message || '图片上传失败'))
+    }, fail: reject
+  }))
+}
+module.exports = { uploadServiceImage, request, createPayment, startFaceIdentity, completeFaceIdentity, wechatLogin, currentUser, logout, clearAccount, uploadAvatar }

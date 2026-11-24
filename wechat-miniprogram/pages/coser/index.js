@@ -10,6 +10,7 @@ Page({
     avatar: '梨',
     isSampleProfile: true,
     favorite: false,
+    media: [],
     scheduleOpen: false,
     selectedDate: '11月16日 周一',
     selectedDateKey: '',
@@ -32,11 +33,11 @@ Page({
   onLoad(options) {
     const serviceId = options.id || 'svc-1'
     const service = services.find((item) => item.id === serviceId) || services[0]
-    this.setData({ serviceId: service.id, service, avatar: service.coser.slice(-1), isSampleProfile: service.id === 'svc-1', favorite: get('favorites', []).includes(service.id) })
+    this.setData({ serviceId, service, avatar: service.coser.slice(-1), isSampleProfile: serviceId === 'svc-1', favorite: get('favorites', []).includes(serviceId) })
     this.refreshReputation()
     request(`/v1/services/${encodeURIComponent(serviceId)}`).then(detail => {
       const live = { ...mapService(detail), description: detail.description || '', serviceTerms: detail.serviceTerms || '', minHours: detail.minHours }
-      this.setData({ service: live, avatar: live.coser.slice(-1), isSampleProfile: false, boundaries: detail.boundaries || [] })
+      this.setData({ service: live, avatar: live.coser.slice(-1), isSampleProfile: false, boundaries: detail.boundaries || [], media: (detail.media || []).map(item => ({ ...item, url: item.url && item.url.startsWith('/') ? `${getApp().globalData.apiBaseUrl}${item.url}` : item.url })) })
     }).catch(() => {})
     request(`/v1/cosers/${encodeURIComponent(serviceId)}/availability`).then(({ slots }) => {
       const days = []
@@ -69,7 +70,7 @@ Page({
     this.setData({ selectedDate: item.full, selectedDateKey: item.key })
   },
   toggleSchedule() { this.setData({ scheduleOpen: !this.data.scheduleOpen }) },
-  openChat() { wx.navigateTo({ url: `/pages/chat/index?name=${encodeURIComponent(this.data.service.coser)}` }) },
+  openChat() { wx.navigateTo({ url: `/pages/chat/index?serviceId=${encodeURIComponent(this.data.serviceId)}&name=${encodeURIComponent(this.data.service.coser)}` }) },
   book() { if (!this.data.dates.length) return wx.showToast({ title: '暂无可约时间', icon: 'none' }); if (!getApp().globalData.localDevMode && !guardBooking()) return; wx.navigateTo({ url: `/pages/booking/index?id=${this.data.serviceId}` }) },
   onShareAppMessage() {
     return { title: this.data.service.title, path: `/pages/coser/index?id=${this.data.serviceId}` }

@@ -20,6 +20,7 @@ const fmt = value => value ? String(value).replace('T', ' ').slice(0, 19) : '—
 const statusColor = status => ({ verified: 'success', pending: 'processing', rejected: 'error', active: 'success', frozen: 'warning', closed: 'default' })[status] || 'default'
 const statusLabel = status => ({ verified: '已通过', pending: '待审核', rejected: '已驳回', active: '正常', frozen: '已冻结', closed: '已注销' })[status] || status || '—'
 const navItems = [
+  { key: 'identity-whitelist', icon: <SafetyCertificateOutlined />, label: '身份证白名单', permission: 'identity:whitelist' },
   { key: 'identities', icon: <SafetyCertificateOutlined />, label: '实名认证', permission: 'identity:read' },
   { key: 'users', icon: <TeamOutlined />, label: '用户管理', permission: 'users:read' },
   { key: 'official-messages', icon: <MailOutlined />, label: '官号私信', permission: 'messages:send' },
@@ -31,7 +32,7 @@ const navItems = [
 ]
 const captions = {
   identities: '查看自动核验结果与脱敏证件信息',
-  users: '查看平台用户信息',
+  users: '查看平台用户信息，为已完成实名核验的用户直接认证 Coser',
   'official-messages': '以「委托助手」官号向指定用户发送私信',
   admins: '管理后台账号及角色',
   roles: '配置各角色可使用的功能',
@@ -99,6 +100,7 @@ function Page({ tab, profile, setProfile, setNotice, officialDraft, onOpenOffici
     } catch (error) { fail(error) }
   }
   const changeAdmin = async (row, values) => { try { await send('/admins/' + encodeURIComponent(row.id), 'PATCH', values); await success('管理员已更新') } catch (error) { fail(error) } }
+  const certifyCoser = (row, status) => Modal.confirm({ title: status === 'verified' ? '直接认证 Coser？' : '撤销 Coser 认证？', content: status === 'verified' ? `将 ${row.nickname || row.id} 设为已认证 Coser。该用户必须已完成成年女性实名认证。` : `撤销 ${row.nickname || row.id} 的 Coser 认证后，其服务将停止展示。`, onOk: async () => { try { await send('/users/' + encodeURIComponent(row.id) + '/coser-verification', 'PATCH', { status }); message.success('Coser 认证状态已更新'); await load() } catch (error) { fail(error); throw error } } })
   const moderate = async (row, decision) => { try { await send('/messages/' + encodeURIComponent(row.messageId || row.id), 'PATCH', { decision }); await success('消息已处置') } catch (error) { fail(error) } }
   const restrict = async row => { try { await send('/conversations/' + encodeURIComponent(row.conversationId) + '/restriction', 'PATCH', { restricted: true, reason: '管理员限制' }); await success('会话已限制') } catch (error) { fail(error) } }
   const viewImage = async row => { try { const response = await fetch('/admin/api/messages/' + encodeURIComponent(row.id) + '/image', { headers: { Authorization: `Bearer ${sessionStorage.getItem('admin_token')}` } }); if (!response.ok) throw new Error('图片加载失败'); const url = URL.createObjectURL(await response.blob()); window.open(url, '_blank'); setTimeout(() => URL.revokeObjectURL(url), 60000) } catch (error) { fail(error) } }
@@ -125,8 +127,10 @@ function Page({ tab, profile, setProfile, setNotice, officialDraft, onOpenOffici
       { title: '用户 ID', dataIndex: 'id' },
       { title: '昵称', dataIndex: 'nickname', render: v => v || '—' },
       { title: '角色', dataIndex: 'role' },
+      { title: '实名状态', render: (_, row) => <Tag color={statusColor(row.identityStatus)}>{statusLabel(row.identityStatus)}</Tag> },
+      { title: 'Coser认证', render: (_, row) => <Tag color={statusColor(row.coserStatus)}>{statusLabel(row.coserStatus)}</Tag> },
       { title: '注册时间', dataIndex: 'createdAt', render: fmt },
-      { title: '操作', key: 'actions', render: (_, row) => canSendOfficial && row.role !== 'official' ? <Button size="small" onClick={() => onOpenOfficial(row.id)}>发私信</Button> : '—' }
+      { title: '操作', key: 'actions', render: (_, row) => <Space wrap>{canSendOfficial && row.role !== 'official' && <Button size="small" onClick={() => onOpenOfficial(row.id)}>发私信</Button>}{profile.permissions.includes('identity:certify-coser') && row.role !== 'official' && (row.coserStatus === 'verified' ? <Button size="small" danger onClick={() => certifyCoser(row, 'unverified')}>撤销认证</Button> : <Button size="small" type="primary" disabled={row.identityStatus !== 'verified' || row.adult !== true || row.gender !== 'F'} onClick={() => certifyCoser(row, 'verified')}>直接认证 Coser</Button>)}</Space> }
     ],
     'official-messages': [
       { title: '时间', dataIndex: 'createdAt', render: fmt },
@@ -138,6 +142,23 @@ function Page({ tab, profile, setProfile, setNotice, officialDraft, onOpenOffici
     audit: [{ title: '时间', dataIndex: 'createdAt', render: fmt }, { title: '操作人', dataIndex: 'username' }, { title: '动作', dataIndex: 'action' }, { title: '目标', dataIndex: 'targetId' }, { title: '详情', dataIndex: 'detail', render: v => v || '—' }],
     messages: [{ title: '时间', dataIndex: 'createdAt', render: fmt }, { title: '发送者', dataIndex: 'senderId' }, { title: '内容', render: (_, row) => row.type === 'image' ? <Button size="small" onClick={() => viewImage(row)}>查看图片</Button> : row.body }, { title: '状态', dataIndex: 'status' }, { title: '会话', dataIndex: 'conversationId' }, { title: '操作', render: (_, row) => canWrite ? <Space><Button size="small" onClick={() => moderate(row, 'approved')}>通过</Button><Button size="small" danger onClick={() => moderate(row, 'rejected')}>驳回</Button><Button size="small" onClick={() => restrict(row)}>限制会话</Button></Space> : '—' }],
     'message-reports': [{ title: '时间', dataIndex: 'createdAt', render: fmt }, { title: '消息', dataIndex: 'messageId' }, { title: '举报人', dataIndex: 'reporterId' }, { title: '原因', dataIndex: 'reason' }, { title: '状态', dataIndex: 'status' }, { title: '操作', render: (_, row) => canWrite ? <Space><Button size="small" onClick={() => moderate(row, 'approved')}>保留消息</Button><Button size="small" danger onClick={() => moderate(row, 'rejected')}>移除消息</Button></Space> : '—' }]
+  }
+  if (tab === 'identity-whitelist') {
+    return <Card title="实名测试白名单">
+      <Alert type="warning" showIcon message="仅供测试：名单内证件可跳过人脸核身和性别校验，仍需登录、成年及证件绑定校验。移除后不撤销已有认证。配置文件中的白名单需单独移除。" style={{ marginBottom: 16 }} />
+      <Form form={form} layout="inline" onFinish={async values => {
+        setSending(true)
+        try { await send('/identity-whitelist', 'POST', values); form.resetFields(); message.success('已添加，立即生效'); await load() } catch (error) { fail(error) } finally { setSending(false) }
+      }}>
+        <Form.Item name="idNumber" rules={[{ required: true, message: '请输入身份证号' }, { pattern: /^[1-9]\d{16}[0-9Xx]$/, message: '请输入18位身份证号' }]}><Input.Password autoComplete="off" placeholder="完整身份证号" maxLength={18} /></Form.Item>
+        <Button htmlType="submit" type="primary" loading={sending}>添加白名单</Button>
+      </Form>
+      <Table style={{ marginTop: 24 }} rowKey="id" loading={loading} dataSource={rows} columns={[
+        { title: '身份证（脱敏）', dataIndex: 'maskedId' },
+        { title: '添加时间', dataIndex: 'createdAt', render: fmt },
+        { title: '操作', render: (_, row) => <Button danger onClick={() => Modal.confirm({ title: '移除该身份证白名单？', content: '移除后不能再通过白名单认证；已有认证状态不变。', onOk: async () => { try { await send('/identity-whitelist/' + encodeURIComponent(row.id), 'DELETE'); await load() } catch(error) { fail(error); throw error } } })}>移除</Button> }
+      ]} />
+    </Card>
   }
   if (tab === 'official-messages') {
     return <>

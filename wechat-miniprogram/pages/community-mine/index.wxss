@@ -1,0 +1,1 @@
+.page{padding:32rpx}.primary{background:#5b67f1;color:white;margin-bottom:30rpx}.item{padding:28rpx;margin-bottom:20rpx;background:white;border-radius:20rpx}.title{display:block;font-weight:700;font-size:32rpx}.actions{display:flex}.actions button{flex:1}

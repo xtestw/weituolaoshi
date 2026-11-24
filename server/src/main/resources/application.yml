@@ -1,6 +1,8 @@
 server:
   port: 8080
 spring:
+  config:
+    import: optional:file:./config/application-private.yml,optional:file:./server/config/application-private.yml
   datasource:
     url: jdbc:h2:file:./data/weituolaoshi;MODE=PostgreSQL;DATABASE_TO_LOWER=TRUE
     username: sa
@@ -11,23 +13,29 @@ spring:
     default-property-inclusion: non_null
   servlet:
     multipart:
-      max-file-size: 2MB
-      max-request-size: 3MB
+      max-file-size: 5MB
+      max-request-size: 6MB
 wechat:
-  app-id: ${WECHAT_APP_ID:}
-  app-secret: ${WECHAT_APP_SECRET:}
+  app-id: ''
+  app-secret: ''
 account:
-  avatar-directory: ${AVATAR_DIRECTORY:./data/avatars}
+  avatar-directory: ./data/avatars
 messages:
-  media-directory: ${MESSAGES_MEDIA_DIRECTORY:./data/messages}
+  media-directory: ./data/messages
+posts:
+  media-directory: ./data/posts
 identity:
-  digest-key: ${IDENTITY_DIGEST_KEY:}
+  # Test-only ID numbers that skip face verification; gender exceptions are separate.
+  face-check-whitelist: ''
+  # Comma-separated test ID numbers; bypass gender checks only. Restart after changes.
+  gender-check-whitelist: ''
+  digest-key: ''
 admin:
-  bootstrap-user: ${ADMIN_BOOTSTRAP_USER:}
-  bootstrap-password: ${ADMIN_BOOTSTRAP_PASSWORD:}
+  bootstrap-user: ''
+  bootstrap-password: ''
 
 faceid:
-  secret-id: ${TENCENTCLOUD_SECRET_ID:}
-  secret-key: ${TENCENTCLOUD_SECRET_KEY:}
-  rule-id: ${TENCENT_FACEID_RULE_ID:}
-  region: ${TENCENT_FACEID_REGION:ap-guangzhou}
+  secret-id: ''
+  secret-key: ''
+  rule-id: ''
+  region: ap-guangzhou

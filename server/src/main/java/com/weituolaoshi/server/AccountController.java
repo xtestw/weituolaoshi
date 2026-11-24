@@ -12,10 +12,13 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.client.RestTemplate;
 import org.springframework.web.multipart.MultipartFile;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 @RestController
 @RequestMapping("/v1")
 public class AccountController {
+    private static final Logger log = LoggerFactory.getLogger(AccountController.class);
     private final JdbcTemplate db;
     private final ObjectMapper json;
     private final RestTemplate http = new RestTemplate();
@@ -44,15 +47,23 @@ public class AccountController {
     }
 
     private Map<String, Object> profile(String id) {
-        return db.queryForMap("SELECT id, nickname, avatar_url AS \"avatarUrl\", role FROM app_user WHERE id = ?", id);
+        return db.queryForMap("SELECT id, nickname, avatar_url AS \"avatarUrl\", phone, bio, role FROM app_user WHERE id = ?", id);
     }
 
     @PostMapping("/auth/wechat-login")
     @Transactional
     public Map<String, Object> login(@RequestBody Map<String, Object> body) {
+        String attemptId = UUID.randomUUID().toString();
         Object code = body.get("code");
-        if (!(code instanceof String) || ((String) code).isBlank()) throw new ApiException(HttpStatus.BAD_REQUEST, "code不能为空");
-        if (appId.isBlank() || appSecret.isBlank()) throw new ApiException(HttpStatus.SERVICE_UNAVAILABLE, "微信登录尚未配置");
+        if (!(code instanceof String) || ((String) code).isBlank()) {
+            log.warn("WeChat login rejected: attemptId={}, reason=missing_code", attemptId);
+            throw new ApiException(HttpStatus.BAD_REQUEST, "code不能为空");
+        }
+        if (appId.isBlank() || appSecret.isBlank()) {
+            log.error("WeChat login rejected: attemptId={}, reason=missing_server_config", attemptId);
+            throw new ApiException(HttpStatus.SERVICE_UNAVAILABLE, "微信登录尚未配置");
+        }
+        log.info("WeChat login started: attemptId={}", attemptId);
         Map<?, ?> result;
         try {
             String url = "https://api.weixin.qq.com/sns/jscode2session?appid=" + java.net.URLEncoder.encode(appId, "UTF-8") +
@@ -60,9 +71,20 @@ public class AccountController {
                 java.net.URLEncoder.encode((String) code, "UTF-8") + "&grant_type=authorization_code";
             String response = http.getForObject(url, String.class);
             result = json.readValue(response, Map.class);
-        } catch (Exception ex) { throw new ApiException(HttpStatus.BAD_GATEWAY, "微信登录服务暂不可用"); }
+        } catch (Exception ex) {
+            log.error("WeChat code exchange failed: attemptId={}, exception={}", attemptId, ex.getClass().getSimpleName());
+            throw new ApiException(HttpStatus.BAD_GATEWAY, "微信登录服务暂不可用");
+        }
         String openid = result == null ? null : (String) result.get("openid");
-        if (openid == null || openid.isBlank()) throw new ApiException(HttpStatus.UNAUTHORIZED, "微信登录凭证无效");
+        if (openid == null || openid.isBlank()) {
+            Object errorCode = result == null ? null : result.get("errcode");
+            String errorMessage = result == null || result.get("errmsg") == null ? "" : String.valueOf(result.get("errmsg"));
+            java.util.regex.Matcher rid = java.util.regex.Pattern.compile("(?:^|[,\\s])rid:\\s*([a-zA-Z0-9-]+)").matcher(errorMessage);
+            log.warn("WeChat code exchange rejected: attemptId={}, errcode={}, rid={}",
+                attemptId, errorCode, rid.find() ? rid.group(1) : "unavailable");
+            throw new ApiException(HttpStatus.UNAUTHORIZED, "微信登录凭证无效");
+        }
+        log.info("WeChat code exchange succeeded: attemptId={}", attemptId);
         List<String> users = db.queryForList("SELECT id FROM app_user WHERE wechat_openid = ?", String.class, openid);
         String id = users.isEmpty() ? "usr-" + UUID.randomUUID() : users.get(0);
         if (users.isEmpty()) db.update("INSERT INTO app_user(id, wechat_openid, identity_provider, identity_subject, nickname, role, last_login_at) VALUES (?, ?, 'wechat', ?, '微信用户', 'customer', CURRENT_TIMESTAMP)", id, openid, openid);
@@ -74,6 +96,7 @@ public class AccountController {
         String token = UUID.randomUUID().toString() + UUID.randomUUID();
         db.update("INSERT INTO user_session(token_hash, user_id, expires_at) VALUES (?, ?, ?)", hash(token), id,
             java.sql.Timestamp.valueOf(LocalDateTime.now().plusDays(30)));
+        log.info("WeChat login succeeded: attemptId={}, accountCreated={}", attemptId, users.isEmpty());
         return Map.of("token", token, "user", profile(id));
     }
 
@@ -96,7 +119,18 @@ public class AccountController {
         Object value = body.get("nickname");
         if (!(value instanceof String) || ((String) value).trim().isEmpty() || ((String) value).trim().length() > 30)
             throw new ApiException(HttpStatus.BAD_REQUEST, "昵称长度须为1至30字");
-        db.update("UPDATE app_user SET nickname = ? WHERE id = ?", ((String) value).trim(), id);
+        Object phoneValue = body.get("phone");
+        Object bioValue = body.get("bio");
+        if (phoneValue != null && !(phoneValue instanceof String) || bioValue != null && !(bioValue instanceof String))
+            throw new ApiException(HttpStatus.BAD_REQUEST, "个人资料格式不正确");
+        Map<String, Object> existing = profile(id);
+        String phone = body.containsKey("phone") ? (phoneValue == null ? null : ((String) phoneValue).trim()) : (String) existing.get("phone");
+        String bio = body.containsKey("bio") ? (bioValue == null ? null : ((String) bioValue).trim()) : (String) existing.get("bio");
+        if (phone != null && !phone.isEmpty() && !phone.matches("1[3-9]\\d{9}"))
+            throw new ApiException(HttpStatus.BAD_REQUEST, "请输入有效的11位手机号");
+        if (bio != null && bio.length() > 500)
+            throw new ApiException(HttpStatus.BAD_REQUEST, "个人简介不能超过500字");
+        db.update("UPDATE app_user SET nickname = ?, phone = ?, bio = ? WHERE id = ?", ((String) value).trim(), phone == null || phone.isEmpty() ? null : phone, bio == null || bio.isEmpty() ? null : bio, id);
         return profile(id);
     }
 

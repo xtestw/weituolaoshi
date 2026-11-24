@@ -1,6 +1,7 @@
 const { services, loadCatalog } = require('../../utils/services')
 const { DISTRICTS, CITIES } = require('../../utils/cities')
 const { get } = require('../../utils/store')
+const { request } = require('../../services/api')
 
 const filterOptions = {
   time: ['全部时间', '今天可约', '本周可约', '周末可约'],
@@ -11,6 +12,7 @@ const filterOptions = {
 Page({
   data: {
     keyword: '',
+    communityResults: [],
     city: '上海',
     filters: [
       { key: 'time', label: '时间', value: '' },
@@ -47,7 +49,9 @@ Page({
     this.setData({ filters, filterSheetOpen: false }, this.applyFilters)
   },
   clearFilters() { this.setData({ filters: this.data.filters.map((item) => ({ ...item, value: '' })) }, this.applyFilters) },
+  openCommunity(e) { wx.navigateTo({ url: `/pages/community-detail/index?id=${e.currentTarget.dataset.id}` }) },
   applyFilters() {
+    request(`/v1/posts?q=${encodeURIComponent(this.data.keyword.trim())}`).then(communityResults => this.setData({ communityResults })).catch(() => this.setData({ communityResults: [] }))
     const selected = Object.fromEntries(this.data.filters.map((item) => [item.key, item.value]))
     const keyword = this.data.keyword.trim().toLowerCase()
     let results = services.filter((item) => (item.city || '上海') === this.data.city && (!keyword || `${item.title}${item.coser}${item.district}`.toLowerCase().includes(keyword)))

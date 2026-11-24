@@ -1,6 +1,7 @@
 const { get, set } = require('../../utils/store')
 const { createPayment, request } = require('../../services/api')
 const { callEmergencyContact } = require('../../utils/emergency')
+const { saveOrder } = require('../../utils/order-api')
 
 const cancelReasons = {
   customer: ['行程计划有变', '身体不适无法到场', '与Coser协商一致', '时间或地点需要调整', '误操作下单', '其他原因'],
@@ -32,10 +33,16 @@ Page({
       set('checkInCodes', { ...codes, [order.id]: code })
     }
     this.setData({ order, checkInCode: order.status === 'service' && code ? code.code : '', reviewed: get('orderReviews', []).some((item) => item.orderId === order.id), boundaryText: (order.boundaries || ['不接受肢体接触', '轻挽手臂', '不饮酒']).join(' · ') })
+    if (order.id.startsWith('ord-') && wx.getStorageSync('account_token')) request(`/v1/orders/${encodeURIComponent(order.id)}`)
+      .then(raw => { const latest = saveOrder(raw); this.setData({ order: latest, checkInCode: latest.checkInCode || '' }) }).catch(() => {})
   },
   verifyIdentity() { wx.navigateTo({ url: '/pages/verify/index?returnTo=order' }) },
   pay() {
     if (!this.data.identityPassed) return this.verifyIdentity()
+    if (getApp().globalData.localDevMode && this.data.order.id.startsWith('ord-'))
+      return request(`/v1/dev/orders/${encodeURIComponent(this.data.order.id)}/pay`, { method: 'POST' })
+        .then(raw => this.setData({ order: saveOrder(raw) }))
+        .catch(err => wx.showToast({ title: err.message || '付款失败', icon: 'none' }))
     createPayment(this.data.order.id).catch(err => wx.showModal({ title: '暂无法支付', content: err.message || '支付服务暂不可用', showCancel: false }))
   },
   updateStatus(status, statusText) {
@@ -43,10 +50,12 @@ Page({
     set('orders', orders)
     this.setData({ order: { ...this.data.order, status, statusText } })
   },
-  contact() { wx.navigateTo({ url: '/pages/chat/index?name=%E9%98%BF%E6%A2%A8' }) },
+  contact() { wx.navigateTo({ url: `/pages/chat/index?orderId=${encodeURIComponent(this.data.order.id)}` }) },
   callEmergencyContact,
   rateOrder() {
-    if (this.data.order.id.startsWith('ord-')) return wx.showModal({ title: '暂无法评分', content: '订单评价服务尚未接入。', showCancel: false })
+    if (this.data.order.id.startsWith('ord-')) return wx.showActionSheet({ itemList: ['5分 · 非常满意', '4分 · 满意', '3分 · 一般', '2分 · 不满意', '1分 · 很不满意'],
+      success: ({ tapIndex }) => request(`/v1/orders/${encodeURIComponent(this.data.order.id)}/reviews`, { method: 'POST', data: { score: 5 - tapIndex } })
+        .then(() => this.setData({ reviewed: true })).catch(err => wx.showToast({ title: err.message || '评价失败', icon: 'none' })) })
     if (this.data.order.status !== 'completed' || this.data.reviewed) return
     wx.showActionSheet({ itemList: ['5分 · 非常满意', '4分 · 满意', '3分 · 一般', '2分 · 不满意', '1分 · 很不满意'], success: ({ tapIndex }) => {
       const reviews = get('orderReviews', [])
@@ -56,7 +65,13 @@ Page({
     } })
   },
   cancel() {
-    if (this.data.order.id && this.data.order.id.startsWith('ord-')) return wx.showModal({ title: '暂无法取消', content: '取消与退款服务尚未接入，请联系平台客服。', showCancel: false })
+    if (this.data.order.id && this.data.order.id.startsWith('ord-')) return wx.showActionSheet({ itemList: cancelReasons.customer,
+      success: ({ tapIndex }) => wx.showModal({ title: '确认申请取消？', content: cancelReasons.customer[tapIndex], success: ({ confirm }) => {
+        if (!confirm) return
+        request(`/v1/orders/${encodeURIComponent(this.data.order.id)}/cancel-requests`, { method: 'POST', data: { reason: cancelReasons.customer[tapIndex] } })
+          .then(raw => { const latest = saveOrder(raw); this.setData({ order: latest }) })
+          .catch(err => wx.showToast({ title: err.message || '取消失败', icon: 'none' }))
+      } }) })
     wx.showActionSheet({ itemList: cancelReasons[this.data.role], success: ({ tapIndex }) => {
       const reason = cancelReasons[this.data.role][tapIndex]
       wx.showModal({
@@ -73,7 +88,12 @@ Page({
     } })
   },
   complete() {
-    if (this.data.order.id && this.data.order.id.startsWith('ord-')) return wx.showModal({ title: '暂无法确认', content: '履约确认服务尚未接入。', showCancel: false })
+    if (this.data.order.id && this.data.order.id.startsWith('ord-')) return wx.showModal({ title: '确认履约完成', content: '等待双方确认后订单才会完成。', success: ({ confirm }) => {
+      if (!confirm) return
+      request(`/v1/orders/${encodeURIComponent(this.data.order.id)}/complete-confirmations`, { method: 'POST' })
+        .then(raw => { const latest = saveOrder(raw); this.setData({ order: latest }); wx.showToast({ title: latest.status === 'completed' ? '订单已完成' : '已确认，等待对方', icon: 'none' }) })
+        .catch(err => wx.showToast({ title: err.message || '确认失败', icon: 'none' }))
+    } })
     wx.showModal({ title: '确认履约完成', content: '双方确认完成后，平台会将订单款结算给Coser。', success: ({ confirm }) => confirm && this.updateStatus('completed', '已完成') })
   }
 })

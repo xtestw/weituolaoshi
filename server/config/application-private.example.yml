@@ -1,0 +1,29 @@
+# Example server settings. Copy values into application-private.yml as needed.
+wechat:
+  app-id: 'wx2a40389a906e9916'
+  app-secret: ''
+payment:
+  merchant-id: ''
+  merchant-serial-number: ''
+  private-key-path: ''
+  api-v3-key: ''
+  notify-url: ''
+  refund-notify-url: ''
+account:
+  avatar-directory: ./data/avatars
+messages:
+  media-directory: ./data/messages
+identity:
+  # Test-only ID numbers that skip face verification; gender exceptions are separate.
+  face-check-whitelist: ''
+  # Comma-separated test ID numbers; bypass gender checks only. Restart after changes.
+  gender-check-whitelist: ''
+  digest-key: ''
+admin:
+  bootstrap-user: ''
+  bootstrap-password: ''
+faceid:
+  secret-id: ''
+  secret-key: ''
+  rule-id: ''
+  region: ap-guangzhou

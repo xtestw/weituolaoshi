@@ -21,7 +21,7 @@ function mapService(item) {
     maxHours: item.maxHours,
     available: !!item.available,
     verified: !!item.verified,
-    coverUrl: item.coverUrl || '',
+    coverUrl: item.coverUrl ? (item.coverUrl.startsWith('/') ? `${getApp().globalData.apiBaseUrl}${item.coverUrl}` : item.coverUrl) : '',
     ipName: item.ipName || '',
     characterName: item.characterName || '',
     gender: '',

@@ -59,7 +59,33 @@ public class AdminController {
         return db.queryForList("SELECT v.id,v.user_id AS \"userId\",u.nickname,v.mode,v.status,v.masked_document_number AS \"maskedId\",v.legal_gender AS \"gender\",v.review_reason AS \"reason\",v.created_at AS \"createdAt\" FROM identity_verification v JOIN app_user u ON u.id=v.user_id ORDER BY v.created_at DESC LIMIT 200");
     }
     @GetMapping("/users") public List<Map<String,Object>> users(@RequestHeader(value="Authorization",required=false) String header) {
-        permitted(header,"users:read"); return db.queryForList("SELECT id,nickname,role,created_at AS \"createdAt\" FROM app_user ORDER BY created_at DESC LIMIT 200");
+        permitted(header,"users:read"); return db.queryForList("SELECT u.id,u.nickname,u.role,u.created_at AS \"createdAt\", " +
+            "v.status AS \"identityStatus\",v.adult,v.legal_gender AS \"gender\",c.verification_status AS \"coserStatus\" " +
+            "FROM app_user u LEFT JOIN identity_verification v ON v.user_id=u.id LEFT JOIN coser_profile c ON c.user_id=u.id ORDER BY u.created_at DESC LIMIT 200");
+    }
+    @PatchMapping("/users/{id}/coser-verification") @Transactional
+    public Map<String,Object> certifyCoser(@RequestHeader(value="Authorization",required=false) String header,@PathVariable String id,@RequestBody Map<String,Object> body) {
+        String actor=permitted(header,"identity:certify-coser");
+        String status=Objects.toString(body.get("status"),"");
+        if(!List.of("verified","unverified").contains(status)) throw new ApiException(HttpStatus.BAD_REQUEST,"认证状态无效");
+        List<Map<String,Object>> users=db.queryForList("SELECT id,role,nickname FROM app_user WHERE id=?",id);
+        if(users.isEmpty()) throw new ApiException(HttpStatus.NOT_FOUND,"用户不存在");
+        if("official".equals(users.get(0).get("role"))) throw new ApiException(HttpStatus.BAD_REQUEST,"官号不能认证为Coser");
+        if("unverified".equals(status)) {
+            db.update("UPDATE coser_profile SET verification_status='unverified',service_status='inactive',updated_at=CURRENT_TIMESTAMP WHERE user_id=?",id);
+            audit(actor,"coser.uncertify",id,"");
+            return Map.of("ok",true,"userId",id,"coserStatus","unverified");
+        }
+        Integer eligible=db.queryForObject("SELECT COUNT(*) FROM identity_verification WHERE user_id=? AND status='verified' AND adult=TRUE AND legal_gender='F'",Integer.class,id);
+        if(eligible==null||eligible==0) throw new ApiException(HttpStatus.CONFLICT,"请先完成成年女性实名认证，再由后台认证Coser");
+        db.update("UPDATE identity_verification SET mode='coser' WHERE user_id=?",id);
+        db.update("UPDATE app_user SET role='coser' WHERE id=?",id);
+        Integer existing=db.queryForObject("SELECT COUNT(*) FROM coser_profile WHERE user_id=?",Integer.class,id);
+        if(existing==null||existing==0) db.update("INSERT INTO coser_profile(user_id,display_name,city,verification_status,service_status) VALUES (?,?, '', 'verified','active')",id,
+            Objects.toString(users.get(0).get("nickname"),"微信用户"));
+        else db.update("UPDATE coser_profile SET verification_status='verified',service_status='active',updated_at=CURRENT_TIMESTAMP WHERE user_id=?",id);
+        audit(actor,"coser.certify",id,"identity already verified");
+        return Map.of("ok",true,"userId",id,"coserStatus","verified");
     }
     @GetMapping("/admins") public List<Map<String,Object>> admins(@RequestHeader(value="Authorization",required=false) String header) {
         permitted(header,"admins:read"); return db.queryForList("SELECT id,username,enabled FROM admin_user ORDER BY username");

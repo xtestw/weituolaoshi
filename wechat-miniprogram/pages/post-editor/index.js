@@ -2,6 +2,7 @@ const { get, set } = require('../../utils/store')
 const { validateVenue } = require('../../utils/cities')
 const { guardBooking } = require('../../utils/eligibility')
 const { hourlyBreakdown } = require('../../utils/pricing')
+const { request, uploadServiceImage } = require('../../services/api')
 
 const defaultBoundaries = [
   { id: 'b1', text: '不接受肢体接触' },
@@ -20,6 +21,7 @@ Page({
   data: {
     navTop: 66,
     editingId: '',
+    originalMediaIds: [],
     images: [],
     title: '',
     description: '',
@@ -30,7 +32,7 @@ Page({
     city: '上海',
     district: '',
     placeDetails: null,
-    place: '公共场所（具体地点待选择）',
+    place: '',
     boundaries: defaultBoundaries,
     boundarySummary: '不接受肢体接触 · 轻挽手臂 · 不饮酒',
     boundarySheetOpen: false,
@@ -50,21 +52,23 @@ Page({
     if (!draft) return
     const blockImages = (draft.blocks || []).filter((item) => item.type === 'image' && item.path)
     const blockText = (draft.blocks || []).find((item) => item.type === 'text')
-    const images = (draft.images || blockImages).map((item, index) => ({ ...item, id: item.id || `image-${index}`, cover: item.cover || index === 0 }))
-    const boundaries = draft.boundaries && draft.boundaries.length ? draft.boundaries : defaultBoundaries
-    const questions = Array.isArray(draft.questions) ? draft.questions : defaultQuestions
+    const savedCover = draft.coverUrl ? [{ id: 'saved-cover', path: `${getApp().globalData.apiBaseUrl}${draft.coverUrl}`, remoteUrl: draft.coverUrl, cover: true }] : []
+    const images = (draft.images && draft.images.length ? draft.images : blockImages.length ? blockImages : savedCover).map((item, index) => ({ ...item, path: item.path || (item.url ? `${getApp().globalData.apiBaseUrl}${item.url}` : ''), remoteUrl: item.remoteUrl || item.url, id: item.id || `image-${index}`, cover: item.cover || index === 0 }))
+    const boundaries = draft.boundaries && draft.boundaries.length ? draft.boundaries.map((item,index) => typeof item === 'string' ? { id: `b-${index}`, text: item } : item) : defaultBoundaries
+    const questions = Array.isArray(draft.questions) ? draft.questions.map((item,index) => typeof item === 'string' ? { id: `q-${index}`, text: item } : item) : defaultQuestions
     this.setData({
       editingId: draft.id,
+      originalMediaIds: (draft.images || []).map(item => item.id),
       images,
       title: draft.title || '',
       description: draft.description || (blockText ? blockText.text : ''),
-      price: String(draft.price || ''),
-      priceBreakdown: hourlyBreakdown(draft.price || ''),
+      price: String(draft.price || Number(draft.pricePerHour) / 100 || ''),
+      priceBreakdown: hourlyBreakdown(draft.price || Number(draft.pricePerHour) / 100 || ''),
       minHours: Number(draft.minHours || 2),
       city: coserCity || draft.city || '上海',
       district: draft.district || '',
       placeDetails: draft.placeDetails || null,
-      place: draft.place || '公共场所（具体地点待选择）',
+      place: draft.place || '',
       boundaries,
       boundarySummary: this.makeBoundarySummary(boundaries),
       questions,
@@ -108,12 +112,12 @@ Page({
     this.setData({ images, dirty: true })
   },
   choosePlace() {
-    if (!get('coserCity', '')) return wx.showToast({ title: '请先定位服务城市', icon: 'none' })
+    if (!get('coserCity', '')) return wx.showToast({ title: '请先选择服务城市', icon: 'none' })
     wx.chooseLocation({ success: (location) => {
       const result = validateVenue(location, this.data.city)
       if (!result.valid) return wx.showToast({ title: result.reason, icon: 'none' })
       this.setData({ place: result.place, district: result.district, placeDetails: result, dirty: true })
-    } })
+    }, fail: () => wx.showToast({ title: '请在地图中选择公共场所', icon: 'none' }) })
   },
   openBoundaryEditor() { this.setData({ boundarySheetOpen: true }) },
   closeBoundaryEditor() { this.setData({ boundarySheetOpen: false }) },
@@ -175,40 +179,24 @@ Page({
     if (!this.data.title.trim()) return wx.showToast({ title: '请填写帖子标题', icon: 'none' })
     if (!this.data.description.trim()) return wx.showToast({ title: '请填写帖子正文', icon: 'none' })
     if (!hourlyBreakdown(this.data.price)) return wx.showToast({ title: '请填写有效的小时价格，最多两位小数', icon: 'none' })
-    if (!this.data.placeDetails || !validateVenue(this.data.placeDetails, this.data.city).valid) return wx.showToast({ title: '请选择开放城区内的公共场所', icon: 'none' })
-    this.persist('review', '已提交审核')
+    this.persist('published', '发布成功')
   },
-  persist(status, message) {
+  async persist(status, message) {
     this.setData({ saving: true })
-    const posts = get('posts', [])
-    const boundaries = this.data.boundaries.filter((item) => item.text.trim())
-    const blocks = this.data.images.map((item) => ({ ...item, type: 'image' })).concat({ id: `text-${Date.now()}`, type: 'text', text: this.data.description })
-    const record = {
-      id: this.data.editingId || `post-${Date.now()}`,
-      images: this.data.images,
-      blocks,
-      title: this.data.title.trim(),
-      description: this.data.description.trim(),
-      price: Number(this.data.price),
-      minHours: Number(this.data.minHours),
-      city: this.data.city,
-      district: this.data.district,
-      place: this.data.place,
-      placeDetails: this.data.placeDetails,
-      boundaries,
-      questions: this.data.questions.filter((item) => item.text.trim()).map((item) => ({ ...item, text: item.text.trim() })),
-      questionCount: this.data.questions.filter((item) => item.text.trim()).length,
-      coverMark: 'COS',
-      status,
-      statusText: status === 'draft' ? '草稿' : '审核中',
-      locked: false
-    }
-    const next = posts.some((item) => item.id === record.id) ? posts.map((item) => item.id === record.id ? record : item) : [record, ...posts]
-    set('posts', next)
-    setTimeout(() => {
-      this.setData({ saving: false, dirty: false })
+    try {
+      if (!wx.getStorageSync('account_token')) throw new Error('请先登录')
+      const d = this.data
+      const payload = { title: d.title.trim(), description: d.description.trim(), city: d.city, place: d.place, pricePerHour: Math.round(Number(d.price) * 100), minHours: Number(d.minHours), boundaries: d.boundaries.filter(item => item.text.trim()).map(item => item.text.trim()), questions: d.questions.filter(item => item.text.trim()).map(item => item.text.trim()) }
+      if (!payload.title || !payload.description || !payload.pricePerHour) throw new Error('请填写标题、正文和价格')
+      const service = await request(d.editingId ? `/v1/services/${d.editingId}` : '/v1/services', { method: d.editingId ? 'PUT' : 'POST', data: payload })
+      this.setData({ editingId: service.id })
+      for (const mediaId of d.originalMediaIds) if (!d.images.some(image => image.id === mediaId)) await request(`/v1/services/${service.id}/images/${mediaId}`, { method: 'DELETE' })
+      this.setData({ originalMediaIds: d.images.filter(image => image.remoteUrl).map(image => image.id) })
+      for (const image of d.images) if (!image.remoteUrl) { const uploaded = await uploadServiceImage(service.id, image.path); image.remoteUrl = uploaded.url }
+      if (status === 'published') await request(`/v1/services/${service.id}/publish`, { method: 'POST' })
       wx.showToast({ title: message })
-      setTimeout(() => wx.navigateBack(), 450)
-    }, 450)
+      setTimeout(() => wx.navigateBack(), 350)
+    } catch(error) { wx.showToast({ title: error.message || '保存失败', icon: 'none' }) }
+    finally { this.setData({ saving: false }) }
   }
 })

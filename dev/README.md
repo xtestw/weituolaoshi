@@ -10,7 +10,7 @@ docker compose exec mysql mysql -u cos_dev -plocal-dev-only cos_marketplace -e '
 ./mvnw spring-boot:run -Dspring-boot.run.profiles=local
 ```
 
-MySQL 在 `127.0.0.1:3307`，初始化为下载的 MySQL v4 11 表方案。首次建库后如需重建容器数据，请先确认不需要保留本地数据，再运行 `docker compose down -v && docker compose up -d mysql`。可通过 `MYSQL_ROOT_PASSWORD`、`MYSQL_PASSWORD` 环境变量覆盖本地默认密码。
+MySQL 在 `127.0.0.1:3307`，初始化为下载的 MySQL v4 11 表方案。首次建库后如需重建容器数据，请先确认不需要保留本地数据，再运行 `docker compose down -v && docker compose up -d mysql`。本地数据库密码在 `compose.yaml` 中配置。
 
 当前 Java API 的 `local` 配置连接 `server/data/local-dev.mv.db`（Flyway V1–V6），默认 `http://localhost:18080`，不改动原有 `weituolaoshi.mv.db`。MySQL 是下一阶段的目标库；两套结构和迁移边界见 `server/docs/v4-schema-integration.md`。不要将 H2 的 V1–V6 迁移直接跑到 MySQL。微信开发者工具中导入 `wechat-miniprogram/`，本地调试在小程序设置中关闭合法域名校验。开发者工具会自动连接 `127.0.0.1:18080`，并使用只在 Spring `local` 配置启用的开发账号登录；真机和正式环境仍使用微信登录。实名核验需要供应商配置，详见 `server/README.md`。
 

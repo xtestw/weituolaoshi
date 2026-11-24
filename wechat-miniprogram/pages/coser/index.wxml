@@ -26,8 +26,9 @@
 
   <view class="section">
     <view class="section__head"><text class="section__title">作品展示</text></view>
+    <view wx:if="{{media.length}}" class="story-grid"><image wx:for="{{media}}" wx:key="url" src="{{item.url}}" mode="aspectFill" style="width:210rpx;height:210rpx;border-radius:16rpx"/></view>
     <view wx:if="{{isSampleProfile}}" class="story-grid"><view class="story story--a"><view class="story__mark">三月七</view><text>三月七 · 漫展同行</text></view><view class="story story--b"><view class="story__mark story__mark--small">✦</view><text>主题合影</text></view><view class="story story--c"><view class="story__mark story__mark--small">✧</view><text>轻剧情互动</text></view></view>
-    <view wx:else class="detail-empty">暂无作品展示，可先私信了解造型与作品</view>
+    <view wx:if="{{!isSampleProfile && !media.length}}" class="detail-empty">暂无作品展示，可先私信了解造型与作品</view>
   </view>
 
   <view class="section">

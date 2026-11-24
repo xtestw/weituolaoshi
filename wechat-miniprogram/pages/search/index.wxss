@@ -26,3 +26,5 @@
 .filter-option--selected { border-color: #b8c0ff; background: var(--color-primary-soft); color: var(--color-primary-ink); font-weight: 750; }
 .filter-option__mark { width: 28rpx; height: 28rpx; flex: none; border: 3rpx solid var(--color-border); border-radius: 50%; }
 .filter-option--selected .filter-option__mark { border: 9rpx solid var(--color-primary); }
+
+.community-head{padding:22rpx 0;font-weight:700;font-size:30rpx}.community-result{display:block;width:100%;padding:22rpx;margin-bottom:14rpx;border-radius:18rpx;background:white;text-align:left}.community-result text{display:block;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}.community-result text:last-child{color:#777;font-size:23rpx}

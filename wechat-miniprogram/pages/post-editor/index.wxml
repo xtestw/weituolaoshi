@@ -51,7 +51,7 @@
       </view>
 
       <button class="setting-row" bindtap="choosePlace">
-        <view class="setting-row__copy"><text class="setting-row__title">服务地点</text><text class="setting-row__value">{{city}} · {{place}}</text></view><view class="control-chevron" aria-hidden="true"></view>
+        <view class="setting-row__copy"><text class="setting-row__title">服务地点（选填）</text><text class="setting-row__value">{{place ? city + ' · ' + place : '暂不填写'}}</text></view><view class="control-chevron" aria-hidden="true"></view>
       </button>
       <button class="setting-row" bindtap="openBoundaryEditor">
         <view class="setting-row__copy"><text class="setting-row__title">相处偏好与边界</text><text class="setting-row__value">{{boundarySummary}}</text></view><view class="control-chevron" aria-hidden="true"></view>

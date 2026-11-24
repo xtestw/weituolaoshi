@@ -1,7 +1,7 @@
 const { get, set } = require('../../utils/store')
-const { request, wechatLogin, currentUser, logout, uploadAvatar } = require('../../services/api')
+const { request, wechatLogin, currentUser, logout } = require('../../services/api')
 Page({
-  data: { role: 'customer', verified: false, genderLabel: '', coserVerified: false, favorites: 0, emergencyContactSet: false, bPendingCount: 1, bServiceCount: 1, averageScore: '—', scoredOrders: 0, coserIncompleteCount: 0, schedulePreview: [], loggedIn: false, loginLoading: false, logoutLoading: false, accountName: '微信登录 / 注册', accountInitial: '我', accountAvatar: '', authError: '', profileEditing: false, profileSaving: false, draftNickname: '', draftAvatar: '' },
+  data: { role: 'customer', verified: false, genderLabel: '', coserVerified: false, favorites: 0, emergencyContactSet: false, bPendingCount: 1, bServiceCount: 1, averageScore: '—', scoredOrders: 0, coserIncompleteCount: 0, schedulePreview: [], loggedIn: false, loginLoading: false, logoutLoading: false, accountName: '登录', accountInitial: '我', accountAvatar: '', authError: '', profileEditing: false, profileSaving: false, draftNickname: '', draftAvatar: '' },
   onShow() {
     if (typeof this.getTabBar === 'function' && this.getTabBar()) this.getTabBar().setData({ selected: 3, hidden: false })
     const cachedUser = wx.getStorageSync('account_user')
@@ -20,8 +20,8 @@ Page({
       const key = `${year}-${String(month).padStart(2, '0')}-${String(date).padStart(2, '0')}`
       schedulePreview.push({ key, date, open: false, today: date === today.getDate() })
     }
-    const role = coserVerified && get('role', 'customer') === 'coser' ? 'coser' : 'customer'
-    if (!coserVerified) set('role', 'customer')
+    const role = !!wx.getStorageSync('account_token') && get('role', 'customer') === 'coser' ? 'coser' : 'customer'
+    if (!wx.getStorageSync('account_token')) set('role', 'customer')
     this.setData({ role, verified: false, eligible: false, coserVerified, favorites: get('favorites', []).length, emergencyContactSet: !!get('emergencyContact', null), bPendingCount: bOrderAccepted ? 0 : 1, bServiceCount: bOrderAccepted ? 2 : 1, averageScore, scoredOrders: reviews.length, coserIncompleteCount, schedulePreview, scheduleMonth: `${year}年${month}月` })
     this.showAccount(wx.getStorageSync('account_token') ? wx.getStorageSync('account_user') : null)
     if (wx.getStorageSync('account_token')) currentUser().then(user => {
@@ -37,38 +37,11 @@ Page({
     const name = user && user.nickname ? user.nickname : '微信用户'
     const avatar = user && user.avatarUrl ? user.avatarUrl : ''
     const coserVerified = !!user && user.role === 'coser'
-    const role = coserVerified && get('role', 'customer') === 'coser' ? 'coser' : 'customer'
-    this.setData({ loggedIn: !!user, coserVerified, role, accountName: user ? name : '微信登录 / 注册', accountInitial: user ? name.slice(0, 1) : '我', accountAvatar: avatar && avatar.startsWith('/') ? `${getApp().globalData.apiBaseUrl}${avatar}` : avatar, authError: '' })
+    const role = !!user && get('role', 'customer') === 'coser' ? 'coser' : 'customer'
+    this.setData({ loggedIn: !!user, coserVerified, role, accountName: user ? name : '登录', accountInitial: user ? name.slice(0, 1) : '我', accountAvatar: avatar && avatar.startsWith('/') ? `${getApp().globalData.apiBaseUrl}${avatar}` : avatar, authError: '' })
   },
-  editProfile() {
-    if (!this.data.loggedIn) return
-    this.setData({ profileEditing: true, draftNickname: this.data.accountName, draftAvatar: '', authError: '' })
-  },
-  cancelProfile() { this.setData({ profileEditing: false, draftAvatar: '', authError: '' }) },
-  onNickname(event) { this.setData({ draftNickname: event.detail.value }) },
-  onChooseAvatar(event) {
-    const path = event.detail.avatarUrl
-    if (path) this.setData({ draftAvatar: path })
-  },
-  async saveProfile() {
-    if (this.data.profileSaving) return
-    const nickname = this.data.draftNickname.trim()
-    if (!nickname || nickname.length > 30) return this.setData({ authError: '昵称长度须为1至30字' })
-    this.setData({ profileSaving: true, authError: '' })
-    try {
-      const user = await request('/v1/users/me', { method: 'PATCH', data: { nickname } })
-      wx.setStorageSync('account_user', user)
-      this.showAccount(user)
-      if (this.data.draftAvatar) {
-        const withAvatar = await uploadAvatar(this.data.draftAvatar)
-        wx.setStorageSync('account_user', withAvatar)
-        this.showAccount(withAvatar)
-      }
-      this.setData({ profileEditing: false, draftAvatar: '' })
-      wx.showToast({ title: '资料已保存', icon: 'success' })
-    } catch (error) { this.setData({ authError: error.message || '保存失败，请重试' }) }
-    finally { this.setData({ profileSaving: false }) }
-  },
+  openCommunityPosts() { if (!this.data.loggedIn) return this.loginAccount(); wx.navigateTo({ url: '/pages/community-mine/index' }) },
+  editProfile() { if (this.data.loggedIn) wx.navigateTo({ url: '/pages/profile-edit/index' }) },
   syncIdentity() {
     return request('/v1/identity/me').then(identity => {
       const verified = identity.status === 'verified'
@@ -93,8 +66,10 @@ Page({
       this.showAccount(user)
       await this.syncIdentity()
       if (user.role === 'coser') await this.syncSchedule()
+      if (!user.avatarUrl || !user.nickname || user.nickname === '微信用户') wx.navigateTo({ url: '/pages/profile-edit/index?firstLogin=1' })
+      return user
     }
-    catch (error) { this.setData({ authError: error.message === 'API_NOT_CONFIGURED' ? '服务尚未配置，请联系平台' : (error.message || '登录失败，请重试') }) }
+    catch (error) { this.setData({ authError: error.message === 'API_NOT_CONFIGURED' ? '服务尚未配置，请联系平台' : (error.message || '登录失败，请重试') }); return null }
     finally { this.setData({ loginLoading: false }) }
   },
   exitAccount() {
@@ -113,7 +88,11 @@ Page({
       finally { this.setData({ logoutLoading: false }) }
     } })
   },
-  setRole(event) { if (!this.data.coserVerified) return; const role = event.currentTarget.dataset.role; set('role', role); this.setData({ role }) },
+  async openCoser() { if (!this.data.loggedIn) { const user = await this.loginAccount(); if (!user) return; if (!user.avatarUrl || !user.nickname || user.nickname === '微信用户') return } else { const user = wx.getStorageSync('account_user') || {}; if (!user.avatarUrl || !user.nickname || user.nickname === '微信用户') return wx.navigateTo({ url: '/pages/profile-edit/index?firstLogin=1' }) } if (!this.data.coserVerified) return this.openCoserVerification(); wx.navigateTo({ url: '/pages/b-dashboard/index' }) },
+  backToCustomer() { set('role', 'customer'); this.setData({ role: 'customer' }) },
+  openCoserVerification() { wx.navigateTo({ url: '/pages/verify/index?returnTo=publish&mode=coser' }) },
+  openCoserPublish() { wx.switchTab({ url: '/pages/publish/index' }) },
+  setRole(event) { if (!this.data.loggedIn) return; const role = event.currentTarget.dataset.role; set('role', role); this.setData({ role }) },
   openOrders() { wx.navigateTo({ url: '/pages/orders/index' }) },
   openVerify() { wx.navigateTo({ url: '/pages/verify/index' }) },
   openVerification() { this.data.verified ? this.openSafety() : this.openVerify() },

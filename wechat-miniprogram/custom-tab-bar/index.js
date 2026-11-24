@@ -2,6 +2,7 @@ Component({
   data: {
     selected: 0,
     hidden: false,
+    unread: 0,
     tabs: [
       { pagePath: '/pages/home/index', text: '首页', type: 'home' },
       { pagePath: '/pages/publish/index', text: 'Coser发布', type: 'plus' },

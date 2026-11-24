@@ -1,0 +1,21 @@
+[Unit]
+Description=Weituolaoshi API and admin
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+User=weituolaoshi
+Group=weituolaoshi
+WorkingDirectory=/opt/weituolaoshi
+ExecStart=/usr/bin/java -Xms64m -Xmx256m -XX:MaxMetaspaceSize=160m -XX:+UseSerialGC -jar /opt/weituolaoshi/server.jar --spring.profiles.active=production --server.address=127.0.0.1 --server.port=18083 --server.forward-headers-strategy=framework --spring.datasource.hikari.maximum-pool-size=5
+Restart=on-failure
+RestartSec=5
+UMask=0077
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/opt/weituolaoshi/data
+
+[Install]
+WantedBy=multi-user.target

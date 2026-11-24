@@ -49,3 +49,5 @@
 .city-sheet__grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16rpx; }
 .city-sheet__option { width: 100%; min-height: 88rpx; margin: 0; padding: 0; display: flex; align-items: center; justify-content: center; border: 1rpx solid var(--color-border); border-radius: 18rpx; background: var(--color-bg); color: var(--color-text); font-size: 28rpx; line-height: 1; }
 .city-sheet__active { border-color: var(--color-primary); background: var(--color-primary-soft); color: var(--color-primary-ink); font-weight: 750; }
+
+.community-section{margin-bottom:28rpx}.community-head{display:flex;justify-content:space-between;align-items:center;padding:20rpx 0;font-size:30rpx;font-weight:700}.community-head button{margin:0;background:transparent;color:#5b67f1;font-size:24rpx}.community-card{display:block;width:100%;text-align:left;background:white;border-radius:20rpx;padding:22rpx;margin-bottom:14rpx}.community-card text{display:block;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}.community-card text:first-child{font-weight:700}.community-card text:last-child{color:#777;font-size:24rpx}

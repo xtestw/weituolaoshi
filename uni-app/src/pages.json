@@ -1,0 +1,45 @@
+{
+  "pages": [
+    { "path": "pages/home/index", "style": { "navigationStyle": "custom", "enablePullDownRefresh": true } },
+    { "path": "pages/search/index", "style": { "navigationStyle": "default", "navigationBarTitleText": "搜索委托" } },
+    { "path": "pages/coser/index", "style": { "navigationStyle": "default", "navigationBarTitleText": "服务详情" } },
+    { "path": "pages/booking/index", "style": { "navigationStyle": "default", "navigationBarTitleText": "预约委托" } },
+    { "path": "pages/verify/index", "style": { "navigationBarTitleText": "实名认证" } },
+    { "path": "pages/orders/index", "style": { "navigationStyle": "default", "navigationBarTitleText": "我的委托" } },
+    { "path": "pages/order-detail/index", "style": { "navigationStyle": "default", "navigationBarTitleText": "委托详情" } },
+    { "path": "pages/messages/index", "style": { "navigationStyle": "default", "navigationBarTitleText": "消息" } },
+    { "path": "pages/chat/index", "style": { "navigationBarTitleText": "消息" } },
+    { "path": "pages/profile/index", "style": { "navigationStyle": "custom" } },
+    { "path": "pages/profile-edit/index", "style": { "navigationBarTitleText": "编辑个人资料" } },
+    { "path": "pages/favorites/index", "style": { "navigationStyle": "default", "navigationBarTitleText": "我的收藏" } },
+    { "path": "pages/safety/index", "style": { "navigationStyle": "default", "navigationBarTitleText": "安全中心" } },
+    { "path": "pages/publish/index", "style": { "navigationStyle": "custom" } },
+    { "path": "pages/post-editor/index", "style": { "navigationStyle": "custom" } },
+    { "path": "pages/community-editor/index", "style": { "navigationBarTitleText": "发布社区帖" } },
+    { "path": "pages/community-detail/index", "style": { "navigationBarTitleText": "社区帖" } },
+    { "path": "pages/community-mine/index", "style": { "navigationBarTitleText": "我的社区帖" } },
+    { "path": "pages/b-dashboard/index", "style": { "navigationStyle": "default", "navigationBarTitleText": "Coser 工作台" } },
+    { "path": "pages/b-orders/index", "style": { "navigationStyle": "default", "navigationBarTitleText": "订单管理" } },
+    { "path": "pages/b-messages/index", "style": { "navigationStyle": "default", "navigationBarTitleText": "消息" } },
+    { "path": "pages/b-calendar/index", "style": { "navigationStyle": "default", "navigationBarTitleText": "档期设置" } },
+    { "path": "pages/b-profile/index", "style": { "navigationStyle": "default", "navigationBarTitleText": "Coser 我的" } }
+  ],
+  "globalStyle": {
+    "navigationBarBackgroundColor": "#ffffff",
+    "navigationBarTextStyle": "black",
+    "navigationBarTitleText": "次元委托",
+    "backgroundColor": "#faf8ff"
+  },
+  "tabBar": {
+    "color": "#7b7481",
+    "selectedColor": "#6d28d9",
+    "backgroundColor": "#ffffff",
+    "list": [
+      { "pagePath": "pages/home/index", "text": "首页", "iconPath": "static/assets/tab-icons/home-outline.png", "selectedIconPath": "static/assets/tab-icons/home.png" },
+      { "pagePath": "pages/publish/index", "text": "Coser发布", "iconPath": "static/assets/tab-icons/plus-outline.png", "selectedIconPath": "static/assets/tab-icons/plus.png" },
+      { "pagePath": "pages/messages/index", "text": "消息", "iconPath": "static/assets/tab-icons/message-outline.png", "selectedIconPath": "static/assets/tab-icons/message.png" },
+      { "pagePath": "pages/profile/index", "text": "我的", "iconPath": "static/assets/tab-icons/user-outline.png", "selectedIconPath": "static/assets/tab-icons/user.png" }
+    ]
+  },
+  "permission": { "scope.userLocation": { "desc": "用于定位Coser服务城市和选择城区内公共交易地点" } }
+}

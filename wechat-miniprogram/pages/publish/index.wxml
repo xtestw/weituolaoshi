@@ -2,7 +2,8 @@
 <view class="page publish-page">
   <view wx:if="{{verified}}" class="publish-summary"><view><text>创作中心</text><text>已认证 · 可发布多个服务帖子</text></view><button bindtap="viewHomepage">预览主页</button></view>
 
-  <button wx:if="{{verified}}" class="coser-city" bindtap="refreshCity"><text>服务城市</text><text>{{coserCity ? coserCity + ' · 重新定位' : '定位我的城市'}} ›</text></button>
+  <button wx:if="{{verified}}" class="coser-city" bindtap="refreshCity"><text>服务城市</text><text>{{coserCity ? coserCity + ' · 更改' : '选择服务城市'}} ›</text></button>
+  <view wx:if="{{cityPickerOpen}}" class="city-mask" bindtap="closeCityPicker"><view class="city-sheet" catchtap="stopTap"><view class="city-head"><text>选择服务城市</text><button bindtap="closeCityPicker">关闭</button></view><view class="city-grid"><button wx:for="{{cities}}" wx:key="*this" data-city="{{item}}" bindtap="chooseCity">{{item}}</button></view></view></view>
 
   <view class="primary-actions"><button class="new-post" bindtap="newPost"><view class="plus"></view><view><text>发布新帖</text><text>{{verified ? '发布新的角色服务' : '先完成真人认证'}}</text></view><text>›</text></button></view>
 
