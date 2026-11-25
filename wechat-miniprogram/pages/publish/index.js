@@ -1,6 +1,6 @@
 const { get, set } = require('../../utils/store')
 const { CITIES } = require('../../utils/cities')
-const { guardBooking } = require('../../utils/eligibility')
+const { guardPublishing } = require('../../utils/eligibility')
 const { request } = require('../../services/api')
 
 Page({
@@ -28,7 +28,7 @@ Page({
         this.setData({ verified })
       } catch (error) { return wx.showToast({ title: error.message || '认证状态获取失败', icon: 'none' }) }
     }
-    if (get('verification', null) && !guardBooking()) return
+    if (get('verification', null) && !guardPublishing()) return
     if (!this.data.verified) return wx.navigateTo({ url: '/pages/verify/index?returnTo=publish&mode=coser' })
     if (!this.data.coserCity) return this.setData({ cityPickerOpen: true, openEditorAfterCity: true })
     wx.navigateTo({ url: '/pages/post-editor/index' })

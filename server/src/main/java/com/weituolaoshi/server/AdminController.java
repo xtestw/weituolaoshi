@@ -19,10 +19,11 @@ public class AdminController {
     private final JdbcTemplate db;
     private final AuthSupport auth;
     private final MessageSocket messageSocket;
+    private final IdentityGenderPolicy genderPolicy;
     private final BCryptPasswordEncoder passwords=new BCryptPasswordEncoder();
     @Value("${admin.bootstrap-user:}") private String bootstrapUser;
     @Value("${admin.bootstrap-password:}") private String bootstrapPassword;
-    public AdminController(JdbcTemplate db,AuthSupport auth,MessageSocket messageSocket) { this.db=db; this.auth=auth; this.messageSocket=messageSocket; }
+    public AdminController(JdbcTemplate db,AuthSupport auth,MessageSocket messageSocket,IdentityGenderPolicy genderPolicy) { this.db=db; this.auth=auth; this.messageSocket=messageSocket; this.genderPolicy=genderPolicy; }
     @Bean CommandLineRunner bootstrapAdmin() { return args -> {
         Integer count=db.queryForObject("SELECT COUNT(*) FROM admin_user",Integer.class);
         if(count==0&&!bootstrapUser.isBlank()&&bootstrapPassword.length()>=12) {
@@ -59,9 +60,82 @@ public class AdminController {
         return db.queryForList("SELECT v.id,v.user_id AS \"userId\",u.nickname,v.mode,v.status,v.masked_document_number AS \"maskedId\",v.legal_gender AS \"gender\",v.review_reason AS \"reason\",v.created_at AS \"createdAt\" FROM identity_verification v JOIN app_user u ON u.id=v.user_id ORDER BY v.created_at DESC LIMIT 200");
     }
     @GetMapping("/users") public List<Map<String,Object>> users(@RequestHeader(value="Authorization",required=false) String header) {
-        permitted(header,"users:read"); return db.queryForList("SELECT u.id,u.nickname,u.role,u.created_at AS \"createdAt\", " +
-            "v.status AS \"identityStatus\",v.adult,v.legal_gender AS \"gender\",c.verification_status AS \"coserStatus\" " +
+        permitted(header,"users:read"); return db.queryForList("SELECT u.id,u.nickname,u.phone,u.bio,u.account_status AS \"accountStatus\",u.role,u.created_at AS \"createdAt\", " +
+            "v.status AS \"identityStatus\",v.adult,v.legal_gender AS \"gender\"," + genderPolicy.sql("v.") + " AS \"genderEligible\",c.verification_status AS \"coserStatus\",c.display_name AS \"coserDisplayName\",c.city AS \"coserCity\" " +
             "FROM app_user u LEFT JOIN identity_verification v ON v.user_id=u.id LEFT JOIN coser_profile c ON c.user_id=u.id ORDER BY u.created_at DESC LIMIT 200");
+    }
+    @GetMapping("/coser-posts") public List<Map<String,Object>> coserPosts(@RequestHeader(value="Authorization",required=false) String header) {
+        permitted(header,"services:read");
+        return db.queryForList("SELECT s.id,s.coser_id AS \"coserId\",u.nickname AS \"coserNickname\",c.display_name AS \"coserName\", " +
+            "s.title,s.description,s.city,s.place_name AS \"place\",s.cover_url AS \"coverUrl\",s.price_per_hour AS \"pricePerHour\", " +
+            "s.min_hours AS \"minHours\",s.status,s.audit_status AS \"auditStatus\",s.visibility,s.manually_offline AS \"manuallyOffline\", " +
+            "s.moderation_reason AS \"moderationReason\",s.moderated_at AS \"moderatedAt\",s.created_at AS \"createdAt\",s.updated_at AS \"updatedAt\" " +
+            "FROM service_post s JOIN app_user u ON u.id=s.coser_id JOIN coser_profile c ON c.user_id=s.coser_id " +
+            "WHERE s.content_kind='commission' AND s.deleted_at IS NULL ORDER BY s.created_at DESC LIMIT 200");
+    }
+    @PatchMapping("/coser-posts/{id}/moderation") @Transactional
+    public Map<String,Object> moderateCoserPost(@RequestHeader(value="Authorization",required=false) String header,@PathVariable String id,@RequestBody Map<String,Object> body) {
+        String actor=permitted(header,"services:moderate"),action=Objects.toString(body.get("action"),"");
+        if(!List.of("offline","restore").contains(action)) throw new ApiException(HttpStatus.BAD_REQUEST,"操作无效");
+        int changed;
+        if("offline".equals(action)) {
+            String reason=Objects.toString(body.get("reason"),"").trim();
+            if(reason.isBlank()||reason.length()>500) throw new ApiException(HttpStatus.BAD_REQUEST,"请填写500字以内的下线原因");
+            changed=db.update("UPDATE service_post SET manually_offline=TRUE,visibility='private',audit_status='rejected',moderation_reason=?,moderated_at=CURRENT_TIMESTAMP,updated_at=CURRENT_TIMESTAMP " +
+                "WHERE id=? AND content_kind='commission' AND status='published' AND visibility='public' AND audit_status='approved' AND deleted_at IS NULL AND manually_offline=FALSE",reason,id);
+            if(changed==0) throw new ApiException(HttpStatus.CONFLICT,"帖子不存在或当前不可下线");
+            audit(actor,"coser_post.offline",id,reason);
+        } else {
+            changed=db.update("UPDATE service_post SET manually_offline=FALSE,visibility='public',audit_status='approved',moderation_reason=NULL,moderated_at=CURRENT_TIMESTAMP,updated_at=CURRENT_TIMESTAMP " +
+                "WHERE id=? AND content_kind='commission' AND status='published' AND deleted_at IS NULL AND manually_offline=TRUE",id);
+            if(changed==0) throw new ApiException(HttpStatus.CONFLICT,"帖子不存在或当前不可恢复");
+            audit(actor,"coser_post.restore",id,"");
+        }
+        return Map.of("ok",true,"id",id,"action",action);
+    }
+    @PatchMapping("/users/{id}") @Transactional
+    public Map<String,Object> editUser(@RequestHeader(value="Authorization",required=false) String header,@PathVariable String id,@RequestBody Map<String,Object> body) {
+        String actor=permitted(header,"users:write");
+        List<Map<String,Object>> targets=db.queryForList("SELECT id,account_status FROM app_user WHERE id=? AND role<>'official'",id);
+        if(targets.isEmpty()) throw new ApiException(HttpStatus.NOT_FOUND,"用户不存在");
+        if("closed".equals(targets.get(0).get("account_status"))) throw new ApiException(HttpStatus.CONFLICT,"已注销账号不可编辑");
+        Set<String> allowed=Set.of("nickname","phone","bio","accountStatus","coserDisplayName","coserCity");
+        if(body.isEmpty()||!allowed.containsAll(body.keySet())) throw new ApiException(HttpStatus.BAD_REQUEST,"编辑字段无效");
+        if(body.containsKey("nickname")) {
+            String value=Objects.toString(body.get("nickname"),"").trim();
+            if(value.isBlank()||value.length()>30) throw new ApiException(HttpStatus.BAD_REQUEST,"昵称需为1到30字");
+            db.update("UPDATE app_user SET nickname=?,updated_at=CURRENT_TIMESTAMP WHERE id=?",value,id);
+        }
+        if(body.containsKey("phone")) {
+            String value=Objects.toString(body.get("phone"),"").trim();
+            if(!value.isEmpty()&&!value.matches("1[3-9]\\d{9}")) throw new ApiException(HttpStatus.BAD_REQUEST,"手机号格式不正确");
+            db.update("UPDATE app_user SET phone=?,updated_at=CURRENT_TIMESTAMP WHERE id=?",value.isEmpty()?null:value,id);
+        }
+        if(body.containsKey("bio")) {
+            String value=Objects.toString(body.get("bio"),"").trim();
+            if(value.length()>500) throw new ApiException(HttpStatus.BAD_REQUEST,"简介最多500字");
+            db.update("UPDATE app_user SET bio=?,updated_at=CURRENT_TIMESTAMP WHERE id=?",value,id);
+        }
+        if(body.containsKey("accountStatus")) {
+            String value=Objects.toString(body.get("accountStatus"),"");
+            if(!List.of("active","frozen").contains(value)) throw new ApiException(HttpStatus.BAD_REQUEST,"账号状态无效");
+            db.update("UPDATE app_user SET account_status=?,updated_at=CURRENT_TIMESTAMP WHERE id=? AND account_status<>'closed'",value,id);
+        }
+        if(body.containsKey("coserDisplayName")||body.containsKey("coserCity")) {
+            if(db.queryForList("SELECT user_id FROM coser_profile WHERE user_id=?",String.class,id).isEmpty()) throw new ApiException(HttpStatus.CONFLICT,"该用户尚无Coser资料");
+            if(body.containsKey("coserDisplayName")) {
+                String value=Objects.toString(body.get("coserDisplayName"),"").trim();
+                if(value.isBlank()||value.length()>100) throw new ApiException(HttpStatus.BAD_REQUEST,"Coser名称需为1到100字");
+                db.update("UPDATE coser_profile SET display_name=?,updated_at=CURRENT_TIMESTAMP WHERE user_id=?",value,id);
+            }
+            if(body.containsKey("coserCity")) {
+                String value=Objects.toString(body.get("coserCity"),"").trim();
+                if(value.length()>80) throw new ApiException(HttpStatus.BAD_REQUEST,"城市最多80字");
+                db.update("UPDATE coser_profile SET city=?,updated_at=CURRENT_TIMESTAMP WHERE user_id=?",value,id);
+            }
+        }
+        audit(actor,"user.update",id,String.join(",",body.keySet()));
+        return Map.of("ok",true,"userId",id);
     }
     @PatchMapping("/users/{id}/coser-verification") @Transactional
     public Map<String,Object> certifyCoser(@RequestHeader(value="Authorization",required=false) String header,@PathVariable String id,@RequestBody Map<String,Object> body) {
@@ -76,8 +150,8 @@ public class AdminController {
             audit(actor,"coser.uncertify",id,"");
             return Map.of("ok",true,"userId",id,"coserStatus","unverified");
         }
-        Integer eligible=db.queryForObject("SELECT COUNT(*) FROM identity_verification WHERE user_id=? AND status='verified' AND adult=TRUE AND legal_gender='F'",Integer.class,id);
-        if(eligible==null||eligible==0) throw new ApiException(HttpStatus.CONFLICT,"请先完成成年女性实名认证，再由后台认证Coser");
+        Integer eligible=db.queryForObject("SELECT COUNT(*) FROM identity_verification v WHERE v.user_id=? AND v.status='verified' AND v.adult=TRUE AND " + genderPolicy.sql("v."),Integer.class,id);
+        if(eligible==null||eligible==0) throw new ApiException(HttpStatus.CONFLICT,"请先完成符合平台规则的成年实名认证，再由后台认证Coser");
         db.update("UPDATE identity_verification SET mode='coser' WHERE user_id=?",id);
         db.update("UPDATE app_user SET role='coser' WHERE id=?",id);
         Integer existing=db.queryForObject("SELECT COUNT(*) FROM coser_profile WHERE user_id=?",Integer.class,id);

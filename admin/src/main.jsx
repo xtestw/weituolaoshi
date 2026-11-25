@@ -23,6 +23,7 @@ const navItems = [
   { key: 'identity-whitelist', icon: <SafetyCertificateOutlined />, label: '身份证白名单', permission: 'identity:whitelist' },
   { key: 'identities', icon: <SafetyCertificateOutlined />, label: '实名认证', permission: 'identity:read' },
   { key: 'users', icon: <TeamOutlined />, label: '用户管理', permission: 'users:read' },
+  { key: 'coser-posts', icon: <AuditOutlined />, label: 'Coser帖子', permission: 'services:read' },
   { key: 'official-messages', icon: <MailOutlined />, label: '官号私信', permission: 'messages:send' },
   { key: 'admins', icon: <UserOutlined />, label: '管理员', permission: 'admins:read' },
   { key: 'roles', icon: <KeyOutlined />, label: '角色权限', permission: 'admins:read' },
@@ -32,7 +33,8 @@ const navItems = [
 ]
 const captions = {
   identities: '查看自动核验结果与脱敏证件信息',
-  users: '查看平台用户信息，为已完成实名核验的用户直接认证 Coser',
+  users: '编辑用户资料、账号状态和 Coser 认证；实名核验结果由核验流程产生',
+  'coser-posts': '查看 Coser 服务帖子，人工下线或恢复展示',
   'official-messages': '以「委托助手」官号向指定用户发送私信',
   admins: '管理后台账号及角色',
   roles: '配置各角色可使用的功能',
@@ -96,11 +98,15 @@ function Page({ tab, profile, setProfile, setNotice, officialDraft, onOpenOffici
       if (modal.kind === 'admin') await send('/admins', 'POST', values)
       if (modal.kind === 'role') await send('/roles', 'POST', values)
       if (modal.kind === 'reset') await send('/admins/' + encodeURIComponent(modal.row.id), 'PATCH', { password: values.password })
+      if (modal.kind === 'user') await send('/users/' + encodeURIComponent(modal.row.id), 'PATCH', values)
+      if (modal.kind === 'offline-post') await send('/coser-posts/' + encodeURIComponent(modal.row.id) + '/moderation', 'PATCH', { action: 'offline', reason: values.reason })
       await success('操作已保存')
     } catch (error) { fail(error) }
   }
   const changeAdmin = async (row, values) => { try { await send('/admins/' + encodeURIComponent(row.id), 'PATCH', values); await success('管理员已更新') } catch (error) { fail(error) } }
-  const certifyCoser = (row, status) => Modal.confirm({ title: status === 'verified' ? '直接认证 Coser？' : '撤销 Coser 认证？', content: status === 'verified' ? `将 ${row.nickname || row.id} 设为已认证 Coser。该用户必须已完成成年女性实名认证。` : `撤销 ${row.nickname || row.id} 的 Coser 认证后，其服务将停止展示。`, onOk: async () => { try { await send('/users/' + encodeURIComponent(row.id) + '/coser-verification', 'PATCH', { status }); message.success('Coser 认证状态已更新'); await load() } catch (error) { fail(error); throw error } } })
+  const certifyCoser = (row, status) => Modal.confirm({ title: status === 'verified' ? '直接认证 Coser？' : '撤销 Coser 认证？', content: status === 'verified' ? `将 ${row.nickname || row.id} 设为已认证 Coser。该用户必须已完成符合平台规则的成年实名认证。` : `撤销 ${row.nickname || row.id} 的 Coser 认证后，其服务将停止展示。`, onOk: async () => { try { await send('/users/' + encodeURIComponent(row.id) + '/coser-verification', 'PATCH', { status }); message.success('Coser 认证状态已更新'); await load() } catch (error) { fail(error); throw error } } })
+  const restorePost = row => Modal.confirm({ title: '恢复帖子展示？', content: `将重新展示「${row.title}」。`, onOk: async () => { try { await send('/coser-posts/' + encodeURIComponent(row.id) + '/moderation', 'PATCH', { action: 'restore' }); message.success('帖子已恢复展示'); await load() } catch (error) { fail(error); throw error } } })
+  const editUser = row => { form.resetFields(); form.setFieldsValue({ nickname: row.nickname || '', phone: row.phone || '', bio: row.bio || '', accountStatus: row.accountStatus || 'active', ...(row.coserStatus ? { coserDisplayName: row.coserDisplayName || '', coserCity: row.coserCity || '' } : {}) }); setModal({ kind: 'user', row }) }
   const moderate = async (row, decision) => { try { await send('/messages/' + encodeURIComponent(row.messageId || row.id), 'PATCH', { decision }); await success('消息已处置') } catch (error) { fail(error) } }
   const restrict = async row => { try { await send('/conversations/' + encodeURIComponent(row.conversationId) + '/restriction', 'PATCH', { restricted: true, reason: '管理员限制' }); await success('会话已限制') } catch (error) { fail(error) } }
   const viewImage = async row => { try { const response = await fetch('/admin/api/messages/' + encodeURIComponent(row.id) + '/image', { headers: { Authorization: `Bearer ${sessionStorage.getItem('admin_token')}` } }); if (!response.ok) throw new Error('图片加载失败'); const url = URL.createObjectURL(await response.blob()); window.open(url, '_blank'); setTimeout(() => URL.revokeObjectURL(url), 60000) } catch (error) { fail(error) } }
@@ -127,10 +133,20 @@ function Page({ tab, profile, setProfile, setNotice, officialDraft, onOpenOffici
       { title: '用户 ID', dataIndex: 'id' },
       { title: '昵称', dataIndex: 'nickname', render: v => v || '—' },
       { title: '角色', dataIndex: 'role' },
+      { title: '账号状态', dataIndex: 'accountStatus', render: value => <Tag color={statusColor(value)}>{statusLabel(value)}</Tag> },
       { title: '实名状态', render: (_, row) => <Tag color={statusColor(row.identityStatus)}>{statusLabel(row.identityStatus)}</Tag> },
       { title: 'Coser认证', render: (_, row) => <Tag color={statusColor(row.coserStatus)}>{statusLabel(row.coserStatus)}</Tag> },
       { title: '注册时间', dataIndex: 'createdAt', render: fmt },
-      { title: '操作', key: 'actions', render: (_, row) => <Space wrap>{canSendOfficial && row.role !== 'official' && <Button size="small" onClick={() => onOpenOfficial(row.id)}>发私信</Button>}{profile.permissions.includes('identity:certify-coser') && row.role !== 'official' && (row.coserStatus === 'verified' ? <Button size="small" danger onClick={() => certifyCoser(row, 'unverified')}>撤销认证</Button> : <Button size="small" type="primary" disabled={row.identityStatus !== 'verified' || row.adult !== true || row.gender !== 'F'} onClick={() => certifyCoser(row, 'verified')}>直接认证 Coser</Button>)}</Space> }
+      { title: '操作', key: 'actions', render: (_, row) => <Space wrap>{profile.permissions.includes('users:write') && row.role !== 'official' && <Button size="small" onClick={() => editUser(row)}>编辑资料</Button>}{canSendOfficial && row.role !== 'official' && <Button size="small" onClick={() => onOpenOfficial(row.id)}>发私信</Button>}{profile.permissions.includes('identity:certify-coser') && row.role !== 'official' && (row.coserStatus === 'verified' ? <Button size="small" danger onClick={() => certifyCoser(row, 'unverified')}>撤销认证</Button> : <Button size="small" type="primary" disabled={row.identityStatus !== 'verified' || row.adult !== true || row.genderEligible !== true} onClick={() => certifyCoser(row, 'verified')}>直接认证 Coser</Button>)}</Space> }
+    ],
+    'coser-posts': [
+      { title: '标题', dataIndex: 'title', render: (value, row) => <div className="user-cell">{value}<small title={row.id}>{row.id}</small></div> },
+      { title: 'Coser', render: (_, row) => <div className="user-cell">{row.coserName || row.coserNickname || '—'}<small title={row.coserId}>{row.coserId}</small></div> },
+      { title: '城市', dataIndex: 'city' },
+      { title: '价格', dataIndex: 'pricePerHour', render: value => `¥${(Number(value) / 100).toFixed(2)}/小时` },
+      { title: '状态', render: (_, row) => <Space><Tag color={row.status === 'published' ? 'success' : 'default'}>{row.status === 'published' ? '已发布' : '草稿/未发布'}</Tag>{row.manuallyOffline ? <Tag color="error">人工下线</Tag> : row.status === 'published' && row.visibility === 'public' && row.auditStatus === 'approved' ? <Tag color="success">展示中</Tag> : <Tag>未展示</Tag>}</Space> },
+      { title: '发布时间', dataIndex: 'createdAt', render: fmt },
+      { title: '操作', render: (_, row) => <Space wrap><Button size="small" onClick={() => setModal({ kind: 'post-detail', row })}>详情</Button>{profile.permissions.includes('services:moderate') && (row.manuallyOffline ? <Button size="small" onClick={() => restorePost(row)}>恢复展示</Button> : row.status === 'published' && row.visibility === 'public' && row.auditStatus === 'approved' && <Button size="small" danger onClick={() => { form.resetFields(); setModal({ kind: 'offline-post', row }) }}>人工下线</Button>)}</Space> }
     ],
     'official-messages': [
       { title: '时间', dataIndex: 'createdAt', render: fmt },
@@ -176,7 +192,10 @@ function Page({ tab, profile, setProfile, setNotice, officialDraft, onOpenOffici
   }
   return <>
     {tab === 'roles' ? <>{canWrite && <Button type="primary" style={{ marginBottom: 16 }} onClick={() => { form.resetFields(); setModal({ kind: 'role' }) }}>新建角色</Button>}{rows.map(role => <RoleCard key={role.id} role={role} permissions={permissions} canWrite={canWrite} onSave={savePermissions} />)}</> : <Card className="content-card" extra={tab === 'admins' && canWrite ? <Button type="primary" onClick={() => { form.resetFields(); setModal({ kind: 'admin' }) }}>新建管理员</Button> : null}><div className="table-scroll"><Table rowKey={row => row.id || `${row.createdAt}-${row.action}-${row.targetId}`} loading={loading} dataSource={rows} columns={columns[tab]} pagination={{ pageSize: 10, showSizeChanger: false }} /></div></Card>}
-    <Modal title={{ admin: '新建管理员', role: '新建角色', reset: '重置管理员密码' }[modal?.kind]} open={!!modal} onCancel={() => setModal(null)} onOk={() => form.submit()} okText="确认" cancelText="取消" destroyOnHidden><Form form={form} layout="vertical" onFinish={submitModal} style={{ paddingTop: 12 }}>
+    <Modal title={{ admin: '新建管理员', role: '新建角色', reset: '重置管理员密码', user: '编辑用户资料', 'offline-post': '人工下线 Coser 帖子', 'post-detail': 'Coser 帖子详情' }[modal?.kind]} open={!!modal} onCancel={() => setModal(null)} onOk={modal?.kind === 'post-detail' ? () => setModal(null) : () => form.submit()} okText={modal?.kind === 'post-detail' ? '关闭' : '确认'} cancelText="取消" destroyOnHidden><Form form={form} layout="vertical" onFinish={submitModal} style={{ paddingTop: 12 }}>
+      {modal?.kind === 'post-detail' && <Space direction="vertical" style={{ width: '100%' }}><Text strong>{modal.row.title}</Text><Text>发布者：{modal.row.coserName || modal.row.coserNickname}（{modal.row.coserId}）</Text><Text>地点：{modal.row.city}{modal.row.place ? ' · ' + modal.row.place : ''}</Text><Text>价格：¥{(Number(modal.row.pricePerHour) / 100).toFixed(2)}/小时 · 至少{modal.row.minHours}小时</Text><Text>内容：{modal.row.description || '—'}</Text>{modal.row.moderationReason && <Alert type="warning" message={'下线原因：' + modal.row.moderationReason} />}</Space>}
+      {modal?.kind === 'offline-post' && <><Alert type="warning" showIcon message="下线后帖子将立即从公开列表和详情中移除；已有订单不受影响。" style={{ marginBottom: 16 }} /><Form.Item name="reason" label="下线原因" rules={[{ required: true, whitespace: true, message: '请填写下线原因' }, { max: 500, message: '最多500字' }]}><TextArea rows={4} maxLength={500} showCount /></Form.Item></>}
+      {modal?.kind === 'user' && <><Form.Item name="nickname" label="昵称" rules={[{ required: true, message: '请输入昵称' }, { max: 30 }]}><Input maxLength={30} /></Form.Item><Form.Item name="phone" label="手机号"><Input maxLength={11} /></Form.Item><Form.Item name="bio" label="个人简介"><TextArea maxLength={500} rows={3} /></Form.Item><Form.Item name="accountStatus" label="账号状态"><Select options={[{ value: 'active', label: '正常' }, { value: 'frozen', label: '冻结' }]} /></Form.Item>{modal.row.coserStatus && <><Form.Item name="coserDisplayName" label="Coser 显示名" rules={[{ required: true, message: '请输入 Coser 显示名' }]}><Input maxLength={100} /></Form.Item><Form.Item name="coserCity" label="Coser 服务城市"><Input maxLength={80} /></Form.Item></>}<Alert type="info" showIcon message="实名状态、成年信息和证件性别由核验结果确定，不能在此修改。" /></>}
       {modal?.kind === 'admin' && <><Form.Item name="username" label="用户名" rules={[{ required: true }, { pattern: /^[A-Za-z0-9_]{3,40}$/, message: '请输入 3–40 位字母、数字或下划线' }]}><Input /></Form.Item><Form.Item name="password" label="密码" rules={[{ required: true }, { min: 12, message: '密码至少 12 位' }]}><Input.Password autoComplete="new-password" /></Form.Item><Form.Item name="role" label="角色" rules={[{ required: true }]}><Select options={roles.map(r => ({ value: r.id, label: r.name }))} /></Form.Item></>}
       {modal?.kind === 'role' && <><Form.Item name="id" label="角色标识" rules={[{ required: true }, { pattern: /^[a-z_]{3,40}$/, message: '请输入 3–40 位小写字母或下划线' }]}><Input placeholder="例如 support" /></Form.Item><Form.Item name="name" label="显示名称" rules={[{ required: true }, { max: 80 }]}><Input /></Form.Item></>}
       {modal?.kind === 'reset' && <Form.Item name="password" label="新密码" rules={[{ required: true }, { min: 12, message: '密码至少 12 位' }]}><Input.Password autoComplete="new-password" /></Form.Item>}

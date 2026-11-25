@@ -47,3 +47,19 @@ systemctl is-enabled certbot.timer
 ## 后台白名单性别豁免（2026-11-24）
 
 基于上一线上包，仅更新 IdentityGenderPolicy 与 admin/dist。后台维护的白名单同时豁免人脸和性别校验，SQL 查询及直接判定实时查询同一表，移除立即恢复性别限制。相关 8 项测试通过。备份：`/opt/weituolaoshi/backups/gender-20261124/`。发布 SHA-256：`c723b618a3df7b5c7042eb46cc7bc4704fd28b86db8581db0531449a0b4972ef`。
+
+## 后台用户编辑与 Coser 认证（2026-11-25 服务器时间）
+
+基于上一线上包增量更新 AdminController、IdentityController、admin/dist，并新增 V20/V21 迁移。线上 JAR SHA-256：`188c198c4b67d80ebff23f0d8a48497850b7ae5406800c4588d31bc578a2f575`。停服备份：`/opt/weituolaoshi/backups/admin-user-edit-20261124/`（旧 JAR 与 data）。独立环境迁移至 V21，后台登录、用户列表及资料修改接口验证通过；线上迁移至 V21，管理页与公开服务接口返回 200。
+
+工作区完整服务端测试 26 项中有 5 项失败，涉及订单、Coser 工作台与帖子流程，因此本次仅发布上述增量文件。回滚时应停服并配套恢复 JAR 与数据库备份。
+
+## 白名单证件发服务帖性别豁免（2026-11-25）
+
+基于上一线上包增量更新 AdminController、IdentityController 和 admin/dist。`/v1/identity/me` 返回按实时白名单计算的 `genderEligible`，后台直接认证 Coser 也使用同一规则。相关白名单与性别策略测试通过，覆盖白名单用户创建服务帖及撤销白名单后的拒绝。线上 JAR SHA-256：`1bbed2e37e8d51c3d4b0c565af105ccfd7eecc13a4481bcc8ea427cefac33437`。备份：`/opt/weituolaoshi/backups/whitelist-posting-20261125/`。线上服务启动正常，管理页和公开服务接口返回 200。
+
+## Coser 帖子人工下线（2026-11-25）
+
+后台新增 Coser 帖子列表、详情、人工下线及恢复展示；下线需填写原因，操作写入管理审计记录。新增 V22 迁移与 `services:read`、`services:moderate` 权限，默认授予超级管理员。下线后公开列表和详情立即隐藏，Coser 自行重新发布不能解除下线状态。
+
+基于上一线上包增量更新 AdminController、V22 迁移和 admin/dist。专项接口测试、后台构建及独立环境迁移与下线恢复验证通过。线上 JAR SHA-256：`5aa9a038ea5eea49ecd3b3d89828bb8bfbfe4eeb59d33de247219bca2c253035`。停服备份：`/opt/weituolaoshi/backups/coser-post-moderation-20261125/`（旧 JAR 与 data）。线上 V22 迁移完成，服务运行正常，管理页和公开服务接口返回 200。

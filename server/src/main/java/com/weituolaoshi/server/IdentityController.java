@@ -52,8 +52,10 @@ public class IdentityController {
     }
 
     private Map<String,Object> status(String user) {
-        List<Map<String,Object>> rows=db.queryForList("SELECT status,mode,adult,legal_gender AS \"gender\",masked_document_number AS \"maskedId\",review_reason AS \"reason\" FROM identity_verification WHERE user_id=?",user);
+        List<Map<String,Object>> rows=db.queryForList("SELECT status,mode,adult,legal_gender AS \"gender\",document_digest AS \"documentDigest\",masked_document_number AS \"maskedId\",review_reason AS \"reason\" FROM identity_verification WHERE user_id=?",user);
         Map<String,Object> result=rows.isEmpty()?new HashMap<>(Map.of("status","unverified")):new HashMap<>(rows.get(0));
+        String digest=(String)result.remove("documentDigest");
+        result.put("genderEligible",genderPolicy.allowsDigest((String)result.get("gender"),digest));
         List<String> coserStatuses=db.queryForList("SELECT verification_status FROM coser_profile WHERE user_id=?",String.class,user);
         result.put("coserStatus",coserStatuses.isEmpty()?"unverified":coserStatuses.get(0));
         return result;

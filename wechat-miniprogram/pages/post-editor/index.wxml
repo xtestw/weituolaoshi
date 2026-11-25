@@ -50,6 +50,9 @@
         <text class="price-breakdown__hint">实际费用按订单成交金额计算，以结算明细为准。</text>
       </view>
 
+      <picker range="{{cities}}" value="{{cityIndex}}" bindchange="onCityChange">
+        <view class="setting-row"><view class="setting-row__copy"><text class="setting-row__title">服务城市</text><text class="setting-row__value">{{city || '请选择服务城市'}}</text></view><view class="control-chevron" aria-hidden="true"></view></view>
+      </picker>
       <button class="setting-row" bindtap="choosePlace">
         <view class="setting-row__copy"><text class="setting-row__title">服务地点（选填）</text><text class="setting-row__value">{{place ? city + ' · ' + place : '暂不填写'}}</text></view><view class="control-chevron" aria-hidden="true"></view>
       </button>

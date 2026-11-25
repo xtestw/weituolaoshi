@@ -33,22 +33,30 @@ Page({
     if (Object.keys(errors).length) return
     const result = parseId(id)
     if (!result.adult) return this.setData({ errors: { submit: '未满18周岁可继续浏览，暂不能下单或发布服务。' } })
-    if (this.data.mode === 'coser' && result.gender !== 'F')
-      return this.setData({ errors: { submit: '全女平台仅支持女性申请Coser认证。' } })
     if (!wx.getStorageSync('account_token'))
       return this.setData({ errors: { submit: '请先在“我的”页面完成微信登录。' } })
-    if (typeof wx.startVerify !== 'function')
-      return this.setData({ errors: { submit: '腾讯云人脸核身 SDK 尚未安装，请联系平台。' } })
     this.setData({ submitting: true })
     try {
-      const { bizToken } = await startFaceIdentity({ name, idNumber: id, mode: this.data.mode, agreed: true })
+      const started = await startFaceIdentity({ name, idNumber: id, mode: this.data.mode, agreed: true })
+      if (started.faceBypassed) {
+        const identity = started.identity || started
+        set('verification', { verified: identity.status === 'verified', adult: identity.adult === true, gender: identity.gender, genderEligible: identity.genderEligible === true })
+        if (this.data.mode === 'coser') set('coserVerification', { status: identity.status, reason: '', submittedAt: Date.now() })
+        this.setData({ idNumber: '', submitting: false })
+        await currentUser()
+        wx.showToast({ title: '测试认证完成', icon: 'success' })
+        setTimeout(() => wx.navigateBack(), 500)
+        return
+      }
+      if (typeof wx.startVerify !== 'function') throw new Error('腾讯云人脸核身 SDK 尚未安装，请联系平台。')
+      const { bizToken } = started
       this.setData({ idNumber: '' })
       wx.startVerify({
         data: { token: bizToken },
         success: () => setTimeout(async () => {
           try {
             const identity = await completeFaceIdentity(bizToken)
-            set('verification', { verified: identity.status === 'verified', adult: identity.adult === true, gender: identity.gender })
+            set('verification', { verified: identity.status === 'verified', adult: identity.adult === true, gender: identity.gender, genderEligible: identity.genderEligible === true })
             if (this.data.mode === 'coser') set('coserVerification', { status: identity.status, reason: '', submittedAt: Date.now() })
             await currentUser()
             wx.showToast({ title: '人脸核身完成', icon: 'success' })

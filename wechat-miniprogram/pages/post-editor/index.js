@@ -1,6 +1,6 @@
 const { get, set } = require('../../utils/store')
-const { validateVenue } = require('../../utils/cities')
-const { guardBooking } = require('../../utils/eligibility')
+const { CITIES, validateVenue } = require('../../utils/cities')
+const { guardPublishing } = require('../../utils/eligibility')
 const { hourlyBreakdown } = require('../../utils/pricing')
 const { request, uploadServiceImage } = require('../../services/api')
 
@@ -29,7 +29,9 @@ Page({
     priceBreakdown: null,
     minHours: 2,
     minHourOptions: [2, 3, 4, 5, 6],
-    city: '上海',
+    city: '',
+    cities: CITIES,
+    cityIndex: 0,
     district: '',
     placeDetails: null,
     place: '',
@@ -47,8 +49,9 @@ Page({
     // 导航行紧接胶囊下方，保留少量间距即可。
     if (menu && menu.bottom) this.setData({ navTop: menu.bottom + 6 })
     const coserCity = get('coserCity', '')
-    if (coserCity) this.setData({ city: coserCity })
     const draft = options.id ? get('draftPost', null) : null
+    const city = (draft && draft.city) || coserCity || ''
+    this.setData({ city, cityIndex: Math.max(0, CITIES.indexOf(city)) })
     if (!draft) return
     const blockImages = (draft.blocks || []).filter((item) => item.type === 'image' && item.path)
     const blockText = (draft.blocks || []).find((item) => item.type === 'text')
@@ -65,7 +68,7 @@ Page({
       price: String(draft.price || Number(draft.pricePerHour) / 100 || ''),
       priceBreakdown: hourlyBreakdown(draft.price || Number(draft.pricePerHour) / 100 || ''),
       minHours: Number(draft.minHours || 2),
-      city: coserCity || draft.city || '上海',
+      city,
       district: draft.district || '',
       placeDetails: draft.placeDetails || null,
       place: draft.place || '',
@@ -82,6 +85,13 @@ Page({
   },
   onMinHours(event) {
     this.setData({ minHours: this.data.minHourOptions[event.detail.value], dirty: true })
+  },
+  onCityChange(event) {
+    const cityIndex = Number(event.detail.value)
+    const city = CITIES[cityIndex]
+    if (!city || city === this.data.city) return
+    this.setData({ city, cityIndex, place: '', district: '', placeDetails: null, dirty: true })
+    set('coserCity', city)
   },
   addImage() {
     const remaining = 9 - this.data.images.length
@@ -112,7 +122,7 @@ Page({
     this.setData({ images, dirty: true })
   },
   choosePlace() {
-    if (!get('coserCity', '')) return wx.showToast({ title: '请先选择服务城市', icon: 'none' })
+    if (!this.data.city) return wx.showToast({ title: '请先选择服务城市', icon: 'none' })
     wx.chooseLocation({ success: (location) => {
       const result = validateVenue(location, this.data.city)
       if (!result.valid) return wx.showToast({ title: result.reason, icon: 'none' })
@@ -172,8 +182,17 @@ Page({
     })
   },
   saveDraft() { this.persist('draft', '已保存草稿') },
-  publish() {
-    if (!guardBooking()) return
+  async publish() {
+    if (this.data.saving) return
+    if (!this.data.city) return wx.showToast({ title: '请先选择服务城市', icon: 'none' })
+    if (wx.getStorageSync('account_token')) {
+      try {
+        const identity = await request('/v1/identity/me')
+        set('verification', { verified: identity.status === 'verified', adult: identity.adult === true, gender: identity.gender, genderEligible: identity.genderEligible === true })
+        set('coserVerification', { status: identity.status === 'verified' && identity.coserStatus === 'verified' ? 'verified' : identity.coserStatus || 'unverified' })
+      } catch (error) { return wx.showToast({ title: error.message || '认证状态获取失败', icon: 'none' }) }
+    }
+    if (!guardPublishing()) return
     if (get('coserVerification', {}).status !== 'verified') return wx.showModal({ title: '请先完成Coser认证', content: '认证通过后才能发布服务帖子。', showCancel: false })
     if (!this.data.images.length) return wx.showToast({ title: '请至少添加一张照片', icon: 'none' })
     if (!this.data.title.trim()) return wx.showToast({ title: '请填写帖子标题', icon: 'none' })

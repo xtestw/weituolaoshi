@@ -103,7 +103,20 @@ class FaceWhitelistTest {
         String id=json.readTree(response).get("id").asText();
         try {
             mvc.perform(post("/v1/identity/verifications").header("Authorization",user).contentType(MediaType.APPLICATION_JSON).content(body(MALE)))
-                .andExpect(status().isOk()).andExpect(jsonPath("$.gender").value("M"));
+                .andExpect(status().isOk()).andExpect(jsonPath("$.gender").value("M")).andExpect(jsonPath("$.genderEligible").value(true));
+            mvc.perform(get("/v1/identity/me").header("Authorization",user))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.genderEligible").value(true))
+                .andExpect(jsonPath("$.documentDigest").doesNotExist());
+            String userId=db.queryForObject("SELECT user_id FROM user_session WHERE token_hash=?",String.class,auth.hash(user.substring(7)));
+            mvc.perform(patch("/admin/api/users/"+userId+"/coser-verification").header("Authorization",admin)
+                .contentType(MediaType.APPLICATION_JSON).content("{\"status\":\"unverified\"}"))
+                .andExpect(status().isOk());
+            mvc.perform(patch("/admin/api/users/"+userId+"/coser-verification").header("Authorization",admin)
+                .contentType(MediaType.APPLICATION_JSON).content("{\"status\":\"verified\"}"))
+                .andExpect(status().isOk());
+            mvc.perform(post("/v1/services").header("Authorization",user).contentType(MediaType.APPLICATION_JSON)
+                .content(json.writeValueAsString(Map.of("title","测试服务","city","上海","pricePerHour",10000,"minHours",2))))
+                .andExpect(status().isOk());
             assertTrue(genderPolicy.allowsNumber("M",MALE));
             String digest=auth.hash("test-key:"+MALE);
             assertEquals(1,db.queryForObject("SELECT COUNT(*) FROM identity_verification v WHERE v.document_digest=? AND v.adult=TRUE AND v.status='verified' AND "+genderPolicy.sql("v."),Integer.class,digest));
@@ -111,6 +124,11 @@ class FaceWhitelistTest {
             mvc.perform(delete("/admin/api/identity-whitelist/"+id).header("Authorization",admin)).andExpect(status().isOk());
         }
         assertFalse(genderPolicy.allowsNumber("M",MALE));
+        mvc.perform(get("/v1/identity/me").header("Authorization",user))
+            .andExpect(status().isOk()).andExpect(jsonPath("$.genderEligible").value(false));
+        mvc.perform(post("/v1/services").header("Authorization",user).contentType(MediaType.APPLICATION_JSON)
+            .content(json.writeValueAsString(Map.of("title","再次发帖","city","上海","pricePerHour",10000,"minHours",2))))
+            .andExpect(status().isForbidden());
         assertEquals(0,db.queryForObject("SELECT COUNT(*) FROM identity_verification v WHERE v.document_digest=? AND "+genderPolicy.sql("v."),Integer.class,auth.hash("test-key:"+MALE)));
     }
 
