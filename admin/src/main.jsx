@@ -4,6 +4,7 @@ import { ConfigProvider, Layout, Menu, Card, Form, Input, Button, Table, Tag, Sp
 import { SafetyCertificateOutlined, TeamOutlined, UserOutlined, KeyOutlined, AuditOutlined, LogoutOutlined, MenuOutlined, CheckCircleOutlined, MailOutlined } from '@ant-design/icons'
 import 'antd/dist/reset.css'
 import './style.css'
+import Feedback from './Feedback'
 
 const { Sider, Header, Content } = Layout
 const { Text, Title } = Typography
@@ -20,6 +21,7 @@ const fmt = value => value ? String(value).replace('T', ' ').slice(0, 19) : '—
 const statusColor = status => ({ verified: 'success', pending: 'processing', rejected: 'error', active: 'success', frozen: 'warning', closed: 'default' })[status] || 'default'
 const statusLabel = status => ({ verified: '已通过', pending: '待审核', rejected: '已驳回', active: '正常', frozen: '已冻结', closed: '已注销' })[status] || status || '—'
 const navItems = [
+  { key: 'feedback', icon: <MailOutlined />, label: '用户反馈', permission: 'feedback:read' },
   { key: 'identity-whitelist', icon: <SafetyCertificateOutlined />, label: '身份证白名单', permission: 'identity:whitelist' },
   { key: 'identities', icon: <SafetyCertificateOutlined />, label: '实名认证', permission: 'identity:read' },
   { key: 'users', icon: <TeamOutlined />, label: '用户管理', permission: 'users:read' },
@@ -32,6 +34,7 @@ const navItems = [
   { key: 'message-reports', icon: <AuditOutlined />, label: '消息举报', permission: 'messages:read' }
 ]
 const captions = {
+  feedback: '查看用户提交的问题、建议、联系方式和截图',
   identities: '查看自动核验结果与脱敏证件信息',
   users: '编辑用户资料、账号状态和 Coser 认证；实名核验结果由核验流程产生',
   'coser-posts': '查看 Coser 服务帖子，人工下线或恢复展示',
@@ -65,7 +68,7 @@ function App() {
   return <Layout className="app-shell">
     {screens.md ? <Sider width={230} className="app-sider" theme="dark"><div className="sider-brand"><div className="brand">次元委托</div><div className="brand-sub">管理后台</div></div>{menu}</Sider> : <Drawer title="次元委托 · 管理后台" placement="left" width={230} open={drawer} onClose={() => setDrawer(false)} styles={{ body: { padding: 0, background: '#001529' } }}>{menu}</Drawer>}
     <Layout><Header className="app-header"><Space>{!screens.md && <Button className="mobile-trigger" type="text" icon={<MenuOutlined />} onClick={() => setDrawer(true)} />}<Text strong>{current?.label || '工作台'}</Text></Space><div className="header-user"><Text className="username">{profile.username}</Text><Tag color="blue">{profile.roles?.join('、')}</Tag><Button type="text" icon={<LogoutOutlined />} onClick={logout}>退出</Button></div></Header>
-      <Content className="app-content"><h1 className="page-title">{current?.label || '工作台'}</h1><p className="page-caption">{captions[tab]}</p>{notice && <Alert type="error" showIcon closable message={notice} onClose={() => setNotice('')} style={{ marginBottom: 16 }} />}{!tab ? <Empty description="当前账号没有可用菜单" /> : <Page key={tab} tab={tab} profile={profile} setProfile={setProfile} setNotice={setNotice} officialDraft={officialDraft} onOpenOfficial={openOfficial} canSendOfficial={can('messages:send')} />}</Content>
+      <Content className="app-content"><h1 className="page-title">{current?.label || '工作台'}</h1><p className="page-caption">{captions[tab]}</p>{notice && <Alert type="error" showIcon closable message={notice} onClose={() => setNotice('')} style={{ marginBottom: 16 }} />}{!tab ? <Empty description="当前账号没有可用菜单" /> : tab === 'feedback' ? <Feedback api={api} /> : <Page key={tab} tab={tab} profile={profile} setProfile={setProfile} setNotice={setNotice} officialDraft={officialDraft} onOpenOfficial={openOfficial} canSendOfficial={can('messages:send')} />}</Content>
     </Layout>
   </Layout>
 }
@@ -143,7 +146,7 @@ function Page({ tab, profile, setProfile, setNotice, officialDraft, onOpenOffici
       { title: '标题', dataIndex: 'title', render: (value, row) => <div className="user-cell">{value}<small title={row.id}>{row.id}</small></div> },
       { title: 'Coser', render: (_, row) => <div className="user-cell">{row.coserName || row.coserNickname || '—'}<small title={row.coserId}>{row.coserId}</small></div> },
       { title: '城市', dataIndex: 'city' },
-      { title: '价格', dataIndex: 'pricePerHour', render: value => `¥${(Number(value) / 100).toFixed(2)}/小时` },
+      { title: '价格', render: (_, row) => `${row.pricingUnit === 'day' ? '' : `¥${(Number(row.pricePerHour) / 100).toFixed(2)}/小时`}${row.pricingUnit === 'both' ? ' · ' : ''}${row.pricingUnit === 'hour' ? '' : `¥${(Number(row.pricePerDay) / 100).toFixed(2)}/天`}` },
       { title: '状态', render: (_, row) => <Space><Tag color={row.status === 'published' ? 'success' : 'default'}>{row.status === 'published' ? '已发布' : '草稿/未发布'}</Tag>{row.manuallyOffline ? <Tag color="error">人工下线</Tag> : row.status === 'published' && row.visibility === 'public' && row.auditStatus === 'approved' ? <Tag color="success">展示中</Tag> : <Tag>未展示</Tag>}</Space> },
       { title: '发布时间', dataIndex: 'createdAt', render: fmt },
       { title: '操作', render: (_, row) => <Space wrap><Button size="small" onClick={() => setModal({ kind: 'post-detail', row })}>详情</Button>{profile.permissions.includes('services:moderate') && (row.manuallyOffline ? <Button size="small" onClick={() => restorePost(row)}>恢复展示</Button> : row.status === 'published' && row.visibility === 'public' && row.auditStatus === 'approved' && <Button size="small" danger onClick={() => { form.resetFields(); setModal({ kind: 'offline-post', row }) }}>人工下线</Button>)}</Space> }
@@ -193,7 +196,7 @@ function Page({ tab, profile, setProfile, setNotice, officialDraft, onOpenOffici
   return <>
     {tab === 'roles' ? <>{canWrite && <Button type="primary" style={{ marginBottom: 16 }} onClick={() => { form.resetFields(); setModal({ kind: 'role' }) }}>新建角色</Button>}{rows.map(role => <RoleCard key={role.id} role={role} permissions={permissions} canWrite={canWrite} onSave={savePermissions} />)}</> : <Card className="content-card" extra={tab === 'admins' && canWrite ? <Button type="primary" onClick={() => { form.resetFields(); setModal({ kind: 'admin' }) }}>新建管理员</Button> : null}><div className="table-scroll"><Table rowKey={row => row.id || `${row.createdAt}-${row.action}-${row.targetId}`} loading={loading} dataSource={rows} columns={columns[tab]} pagination={{ pageSize: 10, showSizeChanger: false }} /></div></Card>}
     <Modal title={{ admin: '新建管理员', role: '新建角色', reset: '重置管理员密码', user: '编辑用户资料', 'offline-post': '人工下线 Coser 帖子', 'post-detail': 'Coser 帖子详情' }[modal?.kind]} open={!!modal} onCancel={() => setModal(null)} onOk={modal?.kind === 'post-detail' ? () => setModal(null) : () => form.submit()} okText={modal?.kind === 'post-detail' ? '关闭' : '确认'} cancelText="取消" destroyOnHidden><Form form={form} layout="vertical" onFinish={submitModal} style={{ paddingTop: 12 }}>
-      {modal?.kind === 'post-detail' && <Space direction="vertical" style={{ width: '100%' }}><Text strong>{modal.row.title}</Text><Text>发布者：{modal.row.coserName || modal.row.coserNickname}（{modal.row.coserId}）</Text><Text>地点：{modal.row.city}{modal.row.place ? ' · ' + modal.row.place : ''}</Text><Text>价格：¥{(Number(modal.row.pricePerHour) / 100).toFixed(2)}/小时 · 至少{modal.row.minHours}小时</Text><Text>内容：{modal.row.description || '—'}</Text>{modal.row.moderationReason && <Alert type="warning" message={'下线原因：' + modal.row.moderationReason} />}</Space>}
+      {modal?.kind === 'post-detail' && <Space direction="vertical" style={{ width: '100%' }}><Text strong>{modal.row.title}</Text><Text>发布者：{modal.row.coserName || modal.row.coserNickname}（{modal.row.coserId}）</Text><Text>地点：{modal.row.city}{modal.row.place ? ' · ' + modal.row.place : ''}</Text><Text>价格：{modal.row.pricingUnit === 'day' ? '' : `¥${(Number(modal.row.pricePerHour) / 100).toFixed(2)}/小时`}{modal.row.pricingUnit === 'both' ? ' · ' : ''}{modal.row.pricingUnit === 'hour' ? '' : `¥${(Number(modal.row.pricePerDay) / 100).toFixed(2)}/天`}</Text><Text>内容：{modal.row.description || '—'}</Text>{modal.row.moderationReason && <Alert type="warning" message={'下线原因：' + modal.row.moderationReason} />}</Space>}
       {modal?.kind === 'offline-post' && <><Alert type="warning" showIcon message="下线后帖子将立即从公开列表和详情中移除；已有订单不受影响。" style={{ marginBottom: 16 }} /><Form.Item name="reason" label="下线原因" rules={[{ required: true, whitespace: true, message: '请填写下线原因' }, { max: 500, message: '最多500字' }]}><TextArea rows={4} maxLength={500} showCount /></Form.Item></>}
       {modal?.kind === 'user' && <><Form.Item name="nickname" label="昵称" rules={[{ required: true, message: '请输入昵称' }, { max: 30 }]}><Input maxLength={30} /></Form.Item><Form.Item name="phone" label="手机号"><Input maxLength={11} /></Form.Item><Form.Item name="bio" label="个人简介"><TextArea maxLength={500} rows={3} /></Form.Item><Form.Item name="accountStatus" label="账号状态"><Select options={[{ value: 'active', label: '正常' }, { value: 'frozen', label: '冻结' }]} /></Form.Item>{modal.row.coserStatus && <><Form.Item name="coserDisplayName" label="Coser 显示名" rules={[{ required: true, message: '请输入 Coser 显示名' }]}><Input maxLength={100} /></Form.Item><Form.Item name="coserCity" label="Coser 服务城市"><Input maxLength={80} /></Form.Item></>}<Alert type="info" showIcon message="实名状态、成年信息和证件性别由核验结果确定，不能在此修改。" /></>}
       {modal?.kind === 'admin' && <><Form.Item name="username" label="用户名" rules={[{ required: true }, { pattern: /^[A-Za-z0-9_]{3,40}$/, message: '请输入 3–40 位字母、数字或下划线' }]}><Input /></Form.Item><Form.Item name="password" label="密码" rules={[{ required: true }, { min: 12, message: '密码至少 12 位' }]}><Input.Password autoComplete="new-password" /></Form.Item><Form.Item name="role" label="角色" rules={[{ required: true }]}><Select options={roles.map(r => ({ value: r.id, label: r.name }))} /></Form.Item></>}

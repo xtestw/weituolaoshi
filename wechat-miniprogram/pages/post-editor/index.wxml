@@ -30,23 +30,32 @@
     </view>
 
     <view class="settings-card">
+      <view class="pricing-unit"><text>计费方式</text><view><button class="pricing-unit__option {{pricingUnit === 'hour' ? 'pricing-unit__option--active' : ''}}" data-unit="hour" bindtap="onPricingUnit">按小时</button><button class="pricing-unit__option {{pricingUnit === 'day' ? 'pricing-unit__option--active' : ''}}" data-unit="day" bindtap="onPricingUnit">按天</button><button class="pricing-unit__option {{pricingUnit === 'both' ? 'pricing-unit__option--active' : ''}}" data-unit="both" bindtap="onPricingUnit">两种都开</button></view></view>
       <view class="price-row">
-        <view class="price-field">
+        <view wx:if="{{pricingUnit !== 'day'}}" class="price-field">
           <text class="price-field__label">小时价格</text>
           <view class="price-field__input"><text class="price-field__currency">¥</text><input class="price-field__control" data-field="price" value="{{price}}" bindinput="onField" type="digit" placeholder="0" aria-label="每小时价格" /><text class="price-field__unit">元/小时</text></view>
         </view>
-        <view class="price-field price-field--hours">
+        <view wx:if="{{pricingUnit !== 'hour'}}" class="price-field">
+          <text class="price-field__label">每天价格</text>
+          <view class="price-field__input"><text class="price-field__currency">¥</text><input class="price-field__control" data-field="dailyPrice" value="{{dailyPrice}}" bindinput="onField" type="digit" placeholder="0" aria-label="每天价格" /><text class="price-field__unit">元/天</text></view>
+        </view>
+        <view wx:if="{{pricingUnit !== 'day'}}" class="price-field price-field--hours">
           <text class="price-field__label">起约</text>
           <picker range="{{minHourOptions}}" bindchange="onMinHours"><view class="price-field__picker"><text>{{minHours}}小时</text><view class="control-chevron control-chevron--down" aria-hidden="true"></view></view></picker>
         </view>
       </view>
-      <view class="price-breakdown" aria-label="小时价格与预计实收明细">
-        <view wx:if="{{priceBreakdown}}" class="price-breakdown__rows">
-          <view class="price-breakdown__line"><text>你设置的小时价格</text><text class="price-breakdown__amount">¥{{priceBreakdown.gross}}/小时</text></view>
-          <view class="price-breakdown__line"><text>平台安全保障费用（5%）</text><text class="price-breakdown__amount">-¥{{priceBreakdown.fee}}/小时</text></view>
+      <text wx:if="{{pricingUnit !== 'hour'}}" class="pricing-day-hint">按天计费为连续 24 小时；按小时最多可约 24 小时。跨日时需对应档期连续开放。</text>
+      <view class="price-breakdown" aria-label="价格与预计实收明细">
+        <view wx:if="{{priceBreakdown && pricingUnit !== 'day'}}" class="price-breakdown__rows">
+          <view class="price-breakdown__line"><text>小时价 · 平台安全保障费用 5%</text><text class="price-breakdown__amount">-¥{{priceBreakdown.fee}}/小时</text></view>
           <view class="price-breakdown__line price-breakdown__line--net"><text>Coser预计实收</text><text class="price-breakdown__amount price-breakdown__amount--net">¥{{priceBreakdown.net}}/小时</text></view>
         </view>
-        <text wx:else class="price-breakdown__empty">填写小时价格后，查看平台费用和预计实收</text>
+        <view wx:if="{{dailyBreakdown && pricingUnit !== 'hour'}}" class="price-breakdown__rows">
+          <view class="price-breakdown__line"><text>日价 · 平台安全保障费用 5%</text><text class="price-breakdown__amount">-¥{{dailyBreakdown.fee}}/天</text></view>
+          <view class="price-breakdown__line price-breakdown__line--net"><text>Coser预计实收</text><text class="price-breakdown__amount price-breakdown__amount--net">¥{{dailyBreakdown.net}}/天</text></view>
+        </view>
+        <text wx:if="{{!priceBreakdown && !dailyBreakdown}}" class="price-breakdown__empty">填写价格后，查看平台费用和预计实收</text>
         <text class="price-breakdown__hint">实际费用按订单成交金额计算，以结算明细为准。</text>
       </view>
 

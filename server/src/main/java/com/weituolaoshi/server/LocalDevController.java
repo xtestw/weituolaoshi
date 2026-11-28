@@ -27,7 +27,7 @@ public class LocalDevController {
         Integer count=db.queryForObject("SELECT COUNT(*) FROM availability_slot WHERE id=?",Integer.class,id);
         if(count==null||count==0) db.update("INSERT INTO availability_slot(id,coser_id,start_at,end_at,status) VALUES (?,? ,?,?,'open')",
             id,"demo-coser-f",Timestamp.valueOf(LocalDateTime.of(date, AvailabilitySupport.WINDOW_START)),
-            Timestamp.valueOf(LocalDateTime.of(date, AvailabilitySupport.WINDOW_END)));
+            Timestamp.valueOf(date.plusDays(1).atStartOfDay()));
     }; }
 
     @PostMapping("/login")

@@ -34,5 +34,6 @@
     <view class="section menu"><button bindtap="backToCustomer"><text>返回用户菜单</text><text>›</text></button></view>
     </block>
   </block>
+  <view class="section menu"><button bindtap="openFeedback"><text>用户反馈</text><text>建议、问题与截图 ›</text></button></view>
   <button wx:if="{{loggedIn}}" class="profile-logout" loading="{{logoutLoading}}" disabled="{{logoutLoading}}" bindtap="exitAccount">退出登录</button>
 </view>

@@ -16,7 +16,7 @@ Page({
       set('coserVerification', { status: verified ? 'verified' : identity.status || 'unverified', reason: identity.reason || '' })
       this.setData({ verified, reviewStatus: verified ? 'verified' : identity.status || 'unverified' })
     }).catch(() => {})
-    if (wx.getStorageSync('account_token')) request('/v1/services/mine').then(rows => this.setData({ posts: rows.map(item => ({ ...item, price: Number(item.pricePerHour) / 100, statusText: item.status === 'draft' ? '草稿' : '已发布' })) })).catch(() => this.setData({ posts: [] }))
+    if (wx.getStorageSync('account_token')) request('/v1/services/mine').then(rows => this.setData({ posts: rows.map(item => ({ ...item, price: Number(item.pricingUnit === 'day' ? item.pricePerDay : item.pricePerHour) / 100, dayPrice: Number(item.pricePerDay || 0) / 100, statusText: item.status === 'draft' ? '草稿' : '已发布' })) })).catch(() => this.setData({ posts: [] }))
   },
   async newPost() {
     if (wx.getStorageSync('account_token')) {

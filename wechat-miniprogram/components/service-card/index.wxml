@@ -1,4 +1,4 @@
-<button class="card" bindtap="open" aria-label="查看{{item.title}}，{{item.price}}元每小时">
+<button class="card" bindtap="open" aria-label="查看{{item.title}}，{{item.price}}元每{{item.pricingUnit === 'day' ? '天' : '小时'}}{{item.pricingUnit === 'both' ? '，' + item.dayPrice + '元每天' : ''}}">
   <view class="cover cover--{{item.tone}}">
     <image wx:if="{{item.coverUrl}}" class="cover__image" src="{{item.coverUrl}}" mode="aspectFill" />
     <view wx:if="{{!item.coverUrl}}" class="cover__orb"></view>
@@ -10,6 +10,6 @@
   <view class="copy">
     <text class="title">{{item.title}}</text>
     <view class="meta"><text class="meta__location">{{item.coser}} · {{item.district}}</text><text wx:if="{{item.rating}}" class="rating">★ {{item.rating}}</text></view>
-    <view class="foot"><text class="price">¥{{item.price}}<text class="price__unit">/小时</text></text><text wx:if="{{item.verified}}" class="verified"><text class="verified__check">✓</text> 真人认证</text></view>
+    <view class="foot"><text class="price">¥{{item.price}}<text class="price__unit">/{{item.pricingUnit === 'day' ? '天' : '小时'}}</text><text wx:if="{{item.pricingUnit === 'both'}}" class="price__unit"> · ¥{{item.dayPrice}}/天</text></text><text wx:if="{{item.verified}}" class="verified"><text class="verified__check">✓</text> 真人认证</text></view>
   </view>
 </button>

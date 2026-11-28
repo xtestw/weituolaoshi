@@ -1,0 +1,9 @@
+<view class="feedback-page">
+  <view wx:if="{{submitted}}" class="feedback-card success"><text class="feedback-title">反馈已提交</text><text class="feedback-hint">感谢你的反馈，我们会认真查看。</text><button class="submit" bindtap="back">返回</button></view>
+  <block wx:else>
+    <view class="feedback-card"><text class="feedback-title">告诉我们你的建议或遇到的问题</text><text class="feedback-hint">请尽量描述操作步骤和问题现象，帮助我们改进。</text><textarea value="{{body}}" maxlength="2000" disabled="{{submitting}}" bindinput="onBody" placeholder="请输入反馈内容（必填）"/><text class="counter">{{body.length}} / 2000</text></view>
+    <view class="feedback-card"><text class="feedback-title">添加截图（选填）</text><text class="feedback-hint">最多3张，每张不超过5MB，支持PNG、JPEG、WebP。</text><view class="screenshots"><view wx:for="{{images}}" wx:key="path" class="screenshot"><image src="{{item.path}}" mode="aspectFill" data-path="{{item.path}}" bindtap="preview"/><button disabled="{{submitting}}" data-index="{{index}}" bindtap="removeImage" aria-label="移除截图">移除</button></view><button wx:if="{{images.length < 3}}" class="add-image" disabled="{{submitting}}" bindtap="chooseImages">＋ 添加截图</button></view></view>
+    <view class="feedback-card"><text class="feedback-title">联系方式（选填）</text><input value="{{contact}}" maxlength="100" disabled="{{submitting}}" bindinput="onContact" placeholder="手机号、微信号或邮箱"/></view>
+    <text wx:if="{{error}}" class="feedback-error">{{error}}</text><button class="submit" loading="{{submitting}}" disabled="{{submitting}}" bindtap="submit">{{submitting ? '正在提交…' : '提交反馈'}}</button>
+  </block>
+</view>

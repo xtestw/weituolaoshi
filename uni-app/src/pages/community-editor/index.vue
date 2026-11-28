@@ -1,6 +1,6 @@
 <template>
 <view class="page page--no-tab community-editor">
-  <view class="heading">{{ id ? '编辑社区帖子' : '发布社区帖子' }}</view>
+  <view class="heading">{{ id ? '编辑动态' : '分享此刻' }}</view>
   <view class="media-head"><text class="media-head__title">图片</text><text class="media-head__hint">{{ images.length }}/9 · 可选</text></view>
   <view class="media-grid">
     <view v-for="(item, index) in images" :key="item.id" class="photo">
@@ -12,12 +12,13 @@
       <text class="media-add__title">添加图片</text>
     </button>
   </view>
-  <input class="field" :value="title" maxlength="200" placeholder="标题" @input="title=$event.detail.value" />
+  <input class="field" :value="title" maxlength="200" placeholder="标题（选填）" @input="title=$event.detail.value" />
+  <text class="public-hint">发布后所有人可见，也会展示在社区；草稿仅自己可见。</text>
   <textarea class="body" :value="body" maxlength="5000" placeholder="分享你的想法、体验或问题" @input="body=$event.detail.value" />
 </view>
 <view class="bottom-actions">
-  <button class="btn" @tap="save('draft')" :disabled="saving">保存草稿</button>
-  <button class="btn btn--primary" @tap="save('published')" :disabled="saving">发布</button>
+  <button class="btn" @tap="save('draft')" :disabled="saving || loading || loadError">保存草稿</button>
+  <button class="btn btn--primary" @tap="save('published')" :disabled="saving || loading || loadError">发布</button>
 </view>
 </template>
 <script>
@@ -25,14 +26,16 @@ import { request, uploadCommunityImage, mediaUrl } from '../../services/api'
 import { get } from '../../utils/store'
 export default {
   data() {
-    return { id: '', title: '', body: '', saving: false, images: [], originalMediaIds: [] }
+    return { id: '', title: '', body: '', saving: false, loading: false, loadError: false, images: [], originalMediaIds: [] }
   },
   onLoad(options) {
+    if (!uni.getStorageSync('account_token')) return uni.switchTab({ url: '/pages/profile/index' })
     this.id = options.id || ''
     if (!this.id) return
+    this.loading = true
     request('/v1/posts/mine').then(rows => {
       const post = rows.find(item => item.id === this.id)
-      if (!post) return
+      if (!post) throw new Error('动态不存在或无权编辑')
       const images = (post.images || []).map((item, index) => ({
         id: item.id || `saved-${index}`,
         path: mediaUrl(item.url),
@@ -43,7 +46,7 @@ export default {
       this.body = post.body
       this.images = images
       this.originalMediaIds = images.map(item => item.id)
-    }).catch(error => uni.showToast({ title: error.message, icon: 'none' }))
+    }).catch(error => { this.loadError = true; uni.showToast({ title: error.message, icon: 'none' }) }).finally(() => { this.loading = false })
   },
   methods: {
     addImage() {
@@ -68,9 +71,10 @@ export default {
       this.images = this.images.filter((_, index) => index !== selected)
     },
     async syncImages(postId) {
-      for (const mediaId of this.originalMediaIds) {
+      for (const mediaId of [...this.originalMediaIds]) {
         if (!this.images.some(image => image.id === mediaId)) {
           await request(`/v1/posts/${encodeURIComponent(postId)}/images/${encodeURIComponent(mediaId)}`, { method: 'DELETE' })
+          this.originalMediaIds = this.originalMediaIds.filter(id => id !== mediaId)
         }
       }
       for (const image of this.images) {
@@ -84,16 +88,18 @@ export default {
       this.originalMediaIds = this.images.map(image => image.id)
     },
     async save(status) {
-      if (!this.title.trim() || !this.body.trim()) return uni.showToast({ title: '请填写标题和正文', icon: 'none' })
+      if (this.saving || this.loading || this.loadError) return
+      if (!this.body.trim()) return uni.showToast({ title: '写一点此刻的想法吧', icon: 'none' })
       this.saving = true
       try {
-        const payload = { title: this.title.trim(), body: this.body.trim(), city: get('currentCity', '上海'), status }
+        const payload = { title: this.title.trim() || this.body.trim().slice(0, 40), body: this.body.trim(), city: get('currentCity', '上海'), status: 'draft' }
         const post = await request(this.id ? `/v1/posts/${this.id}` : '/v1/posts', {
           method: this.id ? 'PUT' : 'POST',
           data: payload
         })
         this.id = post.id || this.id
         await this.syncImages(this.id)
+        if (status === 'published') await request(`/v1/posts/${encodeURIComponent(this.id)}`, { method: 'PUT', data: { ...payload, status } })
         uni.showToast({ title: status === 'draft' ? '草稿已保存' : '发布成功' })
         setTimeout(() => uni.navigateBack(), 300)
       } catch (error) {
@@ -105,7 +111,8 @@ export default {
   }
 }
 </script>
-<style>
+<style scoped>
+.public-hint { display: block; margin-bottom: 20rpx; color: #91819f; font-size: 23rpx; line-height: 1.6; }
 .community-editor { padding-top: 28rpx; }
 .heading { margin-bottom: 28rpx; font-size: var(--type-page); line-height: 1.25; font-weight: var(--weight-page); }
 .media-head { display: flex; align-items: baseline; justify-content: space-between; gap: 16rpx; margin-bottom: 16rpx; }

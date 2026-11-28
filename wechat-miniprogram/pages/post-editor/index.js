@@ -26,7 +26,10 @@ Page({
     title: '',
     description: '',
     price: '',
+    dailyPrice: '',
+    pricingUnit: 'hour',
     priceBreakdown: null,
+    dailyBreakdown: null,
     minHours: 2,
     minHourOptions: [2, 3, 4, 5, 6],
     city: '',
@@ -65,8 +68,11 @@ Page({
       images,
       title: draft.title || '',
       description: draft.description || (blockText ? blockText.text : ''),
-      price: String(draft.price || Number(draft.pricePerHour) / 100 || ''),
-      priceBreakdown: hourlyBreakdown(draft.price || Number(draft.pricePerHour) / 100 || ''),
+      price: draft.pricingUnit === 'day' ? '' : String(Number(draft.pricePerHour) / 100 || draft.price || ''),
+      dailyPrice: draft.pricingUnit === 'hour' ? '' : String(Number(draft.pricePerDay) / 100 || draft.price || ''),
+      pricingUnit: draft.pricingUnit || 'hour',
+      priceBreakdown: draft.pricingUnit === 'day' ? null : hourlyBreakdown(Number(draft.pricePerHour) / 100 || draft.price || ''),
+      dailyBreakdown: draft.pricingUnit === 'hour' ? null : hourlyBreakdown(Number(draft.pricePerDay) / 100 || draft.price || ''),
       minHours: Number(draft.minHours || 2),
       city,
       district: draft.district || '',
@@ -81,10 +87,15 @@ Page({
   onField(event) {
     const field = event.currentTarget.dataset.field
     const value = event.detail.value
-    this.setData({ [field]: value, ...(field === 'price' ? { priceBreakdown: hourlyBreakdown(value) } : {}), dirty: true })
+    this.setData({ [field]: value, ...(field === 'price' ? { priceBreakdown: hourlyBreakdown(value) } : {}), ...(field === 'dailyPrice' ? { dailyBreakdown: hourlyBreakdown(value) } : {}), dirty: true })
   },
   onMinHours(event) {
     this.setData({ minHours: this.data.minHourOptions[event.detail.value], dirty: true })
+  },
+  onPricingUnit(event) {
+    const pricingUnit = event.currentTarget.dataset.unit
+    if (!['hour', 'day', 'both'].includes(pricingUnit)) return
+    this.setData({ pricingUnit, dirty: true })
   },
   onCityChange(event) {
     const cityIndex = Number(event.detail.value)
@@ -197,7 +208,9 @@ Page({
     if (!this.data.images.length) return wx.showToast({ title: '请至少添加一张照片', icon: 'none' })
     if (!this.data.title.trim()) return wx.showToast({ title: '请填写帖子标题', icon: 'none' })
     if (!this.data.description.trim()) return wx.showToast({ title: '请填写帖子正文', icon: 'none' })
-    if (!hourlyBreakdown(this.data.price)) return wx.showToast({ title: '请填写有效的小时价格，最多两位小数', icon: 'none' })
+    if ((this.data.pricingUnit !== 'day' && !hourlyBreakdown(this.data.price)) ||
+        (this.data.pricingUnit !== 'hour' && !hourlyBreakdown(this.data.dailyPrice)))
+      return wx.showToast({ title: '请填写有效价格，最多两位小数', icon: 'none' })
     this.persist('published', '发布成功')
   },
   async persist(status, message) {
@@ -205,8 +218,8 @@ Page({
     try {
       if (!wx.getStorageSync('account_token')) throw new Error('请先登录')
       const d = this.data
-      const payload = { title: d.title.trim(), description: d.description.trim(), city: d.city, place: d.place, pricePerHour: Math.round(Number(d.price) * 100), minHours: Number(d.minHours), boundaries: d.boundaries.filter(item => item.text.trim()).map(item => item.text.trim()), questions: d.questions.filter(item => item.text.trim()).map(item => item.text.trim()) }
-      if (!payload.title || !payload.description || !payload.pricePerHour) throw new Error('请填写标题、正文和价格')
+      const payload = { title: d.title.trim(), description: d.description.trim(), city: d.city, place: d.place, pricingUnit: d.pricingUnit, pricePerHour: d.pricingUnit !== 'day' ? Math.round(Number(d.price) * 100) : undefined, pricePerDay: d.pricingUnit !== 'hour' ? Math.round(Number(d.dailyPrice) * 100) : undefined, minHours: Number(d.minHours), boundaries: d.boundaries.filter(item => item.text.trim()).map(item => item.text.trim()), questions: d.questions.filter(item => item.text.trim()).map(item => item.text.trim()) }
+      if (!payload.title || !payload.description || (d.pricingUnit !== 'day' && !hourlyBreakdown(d.price)) || (d.pricingUnit !== 'hour' && !hourlyBreakdown(d.dailyPrice))) throw new Error('请填写标题、正文和价格')
       const service = await request(d.editingId ? `/v1/services/${d.editingId}` : '/v1/services', { method: d.editingId ? 'PUT' : 'POST', data: payload })
       this.setData({ editingId: service.id })
       for (const mediaId of d.originalMediaIds) if (!d.images.some(image => image.id === mediaId)) await request(`/v1/services/${service.id}/images/${mediaId}`, { method: 'DELETE' })

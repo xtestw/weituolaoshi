@@ -73,6 +73,20 @@ public class CustomerPostController {
         attachEngagement(rows, optionalUser(bearer));
         return rows;
     }
+    @GetMapping("/by-user/{userId}")
+    public Map<String,Object> timeline(@PathVariable String userId,
+            @RequestParam(defaultValue="0") int offset, @RequestParam(defaultValue="20") int limit,
+            @RequestHeader(value="Authorization",required=false) String bearer) {
+        if (offset < 0 || limit < 1 || limit > 50) throw new ApiException(HttpStatus.BAD_REQUEST,"分页参数不合法");
+        Integer exists = db.queryForObject("SELECT COUNT(*) FROM app_user WHERE id=? AND account_status='active'", Integer.class, userId);
+        if (exists == null || exists == 0) throw new ApiException(HttpStatus.NOT_FOUND,"主页不存在或暂不可访问");
+        List<Map<String,Object>> rows = select("p.author_id=? AND p.status='published' AND p.deleted_at IS NULL AND u.account_status='active' ORDER BY p.created_at DESC,p.id DESC LIMIT ? OFFSET ?", userId, limit + 1, offset);
+        boolean hasMore = rows.size() > limit;
+        if (hasMore) rows = new ArrayList<>(rows.subList(0, limit));
+        attachEngagement(rows, optionalUser(bearer));
+        return Map.of("items", rows, "hasMore", hasMore);
+    }
+
     @GetMapping("/mine")
     public List<Map<String,Object>> mine(@RequestHeader("Authorization") String bearer) {
         String user=auth.user(bearer);
@@ -91,8 +105,6 @@ public class CustomerPostController {
     @Transactional
     public Map<String,Object> create(@RequestHeader("Authorization") String bearer,@RequestBody Map<String,Object> body) {
         String user=auth.user(bearer), id="post-"+UUID.randomUUID();
-        String role=db.queryForObject("SELECT role FROM app_user WHERE id=?",String.class,user);
-        if(!"customer".equals(role)) throw new ApiException(HttpStatus.FORBIDDEN,"请使用普通用户身份发布社区帖");
         String status="draft".equals(body.get("status")) ? "draft" : "published";
         String title=text(body,"title",200), content=text(body,"body",5000);
         String city=cityValue(body);

@@ -56,9 +56,10 @@ Page({
     const keyword = this.data.keyword.trim().toLowerCase()
     let results = services.filter((item) => (item.city || '上海') === this.data.city && (!keyword || `${item.title}${item.coser}${item.district}`.toLowerCase().includes(keyword)))
     if (selected.time && selected.time !== '全部时间') results = results.filter((item) => item.available)
-    if (selected.price === '¥150以下') results = results.filter((item) => item.price < 150)
-    if (selected.price === '¥150–200') results = results.filter((item) => item.price >= 150 && item.price <= 200)
-    if (selected.price === '¥200以上') results = results.filter((item) => item.price > 200)
+    const hourlyEquivalent = item => item.pricingUnit === 'day' ? item.price / 8 : item.price
+    if (selected.price === '¥150以下') results = results.filter((item) => hourlyEquivalent(item) < 150)
+    if (selected.price === '¥150–200') results = results.filter((item) => hourlyEquivalent(item) >= 150 && hourlyEquivalent(item) <= 200)
+    if (selected.price === '¥200以上') results = results.filter((item) => hourlyEquivalent(item) > 200)
     if (selected.district && selected.district !== `全${this.data.city}`) results = results.filter((item) => item.district === selected.district)
     if (selected.credit === '信用极好') results = results.filter((item) => item.credit === 'excellent')
     if (selected.credit === '4.8分以上') results = results.filter((item) => item.rating >= 4.8)

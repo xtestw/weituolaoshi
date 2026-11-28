@@ -33,7 +33,7 @@ class AvailabilityControllerTest {
         JsonNode before = body(mvc.perform(get("/v1/cosers/me/availability")
             .header("X-Demo-User", "demo-coser-f").param("month", date.toString().substring(0, 7)))
             .andExpect(status().isOk())
-            .andExpect(jsonPath("$.windowLabel").value("10:00–22:00"))
+            .andExpect(jsonPath("$.windowLabel").value("00:00–次日00:00"))
             .andReturn());
         assertFalse(openFor(before, date));
         assertEquals("closed", statusFor(before, date));

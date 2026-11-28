@@ -12,6 +12,7 @@
     "pages/chat/index",
     "pages/profile/index",
     "pages/profile-edit/index",
+    "pages/feedback/index",
     "pages/favorites/index",
     "pages/safety/index",
     "pages/publish/index",

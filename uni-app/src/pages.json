@@ -1,6 +1,7 @@
 {
   "pages": [
     { "path": "pages/home/index", "style": { "navigationStyle": "custom", "enablePullDownRefresh": true } },
+    { "path": "pages/user-home/index", "style": { "navigationBarTitleText": "个人主页", "enablePullDownRefresh": true } },
     { "path": "pages/search/index", "style": { "navigationStyle": "default", "navigationBarTitleText": "搜索委托" } },
     { "path": "pages/coser/index", "style": { "navigationStyle": "default", "navigationBarTitleText": "服务详情" } },
     { "path": "pages/booking/index", "style": { "navigationStyle": "default", "navigationBarTitleText": "预约委托" } },
@@ -22,7 +23,8 @@
     { "path": "pages/b-orders/index", "style": { "navigationStyle": "default", "navigationBarTitleText": "订单管理" } },
     { "path": "pages/b-messages/index", "style": { "navigationStyle": "default", "navigationBarTitleText": "消息" } },
     { "path": "pages/b-calendar/index", "style": { "navigationStyle": "default", "navigationBarTitleText": "档期设置" } },
-    { "path": "pages/b-profile/index", "style": { "navigationStyle": "default", "navigationBarTitleText": "Coser 我的" } }
+    { "path": "pages/b-profile/index", "style": { "navigationStyle": "default", "navigationBarTitleText": "Coser 我的" } },
+    { "path": "pages/feedback/index", "style": { "navigationBarTitleText": "用户反馈" } }
   ],
   "globalStyle": {
     "navigationBarBackgroundColor": "#ffffff",

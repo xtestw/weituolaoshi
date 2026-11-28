@@ -1,11 +1,11 @@
 <template>
 <view class="page">
-  <button class="primary" @tap="create">发布社区帖子</button>
+  <button class="primary" @tap="create">发布动态</button>
   <view v-for="post in posts" :key="post.id" class="item">
     <text class="title" @tap="open(post)">{{ post.title }}</text><text>{{ post.status === 'draft' ? '草稿' : '已发布' }}</text>
     <view class="actions"><button @tap="edit(post)">编辑</button><button @tap="remove(post)">删除</button></view>
   </view>
-  <view v-if="!posts.length">还没有社区帖子</view>
+  <view v-if="!posts.length">还没有动态，分享你的第一条日常吧</view>
 </view>
 </template>
 <script>

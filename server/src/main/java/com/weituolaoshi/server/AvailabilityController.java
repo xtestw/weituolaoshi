@@ -79,15 +79,18 @@ public class AvailabilityController {
         for (java.sql.Date item : openDates) open.add(item.toLocalDate());
 
         List<Map<String, Object>> occupiedRows = db.queryForList(
-            "SELECT CAST(occupied_start_at AS DATE) AS occupied_day, COUNT(*) AS cnt FROM order_appointment " +
+            "SELECT occupied_start_at, occupied_end_at FROM order_appointment " +
             "WHERE coser_id=? AND occupied_start_at<? AND occupied_end_at>? AND " +
             "(status IN ('confirmed','in_service') OR (status='held' AND hold_expires_at>CURRENT_TIMESTAMP) OR " +
-            "(status='awaiting_coser' AND confirm_expires_at>CURRENT_TIMESTAMP)) " +
-            "GROUP BY CAST(occupied_start_at AS DATE)", user, last, first);
+            "(status='awaiting_coser' AND confirm_expires_at>CURRENT_TIMESTAMP))", user, last, first);
         Map<LocalDate, Integer> occupied = new HashMap<>();
         for (Map<String, Object> row : occupiedRows) {
-            LocalDate day = ((java.sql.Date) row.get("occupied_day")).toLocalDate();
-            occupied.put(day, ((Number) row.get("cnt")).intValue());
+            LocalDateTime from = ((Timestamp) row.get("occupied_start_at")).toLocalDateTime();
+            LocalDateTime until = ((Timestamp) row.get("occupied_end_at")).toLocalDateTime();
+            for (LocalDate day = from.toLocalDate(); day.atStartOfDay().isBefore(until); day = day.plusDays(1)) {
+                if (!day.isBefore(target.atDay(1)) && day.isBefore(target.plusMonths(1).atDay(1)))
+                    occupied.merge(day, 1, Integer::sum);
+            }
         }
 
         LocalDate today = LocalDate.now(AvailabilitySupport.ZONE);

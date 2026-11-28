@@ -67,7 +67,7 @@ public class AdminController {
     @GetMapping("/coser-posts") public List<Map<String,Object>> coserPosts(@RequestHeader(value="Authorization",required=false) String header) {
         permitted(header,"services:read");
         return db.queryForList("SELECT s.id,s.coser_id AS \"coserId\",u.nickname AS \"coserNickname\",c.display_name AS \"coserName\", " +
-            "s.title,s.description,s.city,s.place_name AS \"place\",s.cover_url AS \"coverUrl\",s.price_per_hour AS \"pricePerHour\", " +
+            "s.title,s.description,s.city,s.place_name AS \"place\",s.cover_url AS \"coverUrl\",s.price_per_hour AS \"pricePerHour\",s.price_per_day AS \"pricePerDay\",s.pricing_unit AS \"pricingUnit\", " +
             "s.min_hours AS \"minHours\",s.status,s.audit_status AS \"auditStatus\",s.visibility,s.manually_offline AS \"manuallyOffline\", " +
             "s.moderation_reason AS \"moderationReason\",s.moderated_at AS \"moderatedAt\",s.created_at AS \"createdAt\",s.updated_at AS \"updatedAt\" " +
             "FROM service_post s JOIN app_user u ON u.id=s.coser_id JOIN coser_profile c ON c.user_id=s.coser_id " +

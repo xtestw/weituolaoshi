@@ -47,7 +47,7 @@ public class AccountController {
     }
 
     private Map<String, Object> profile(String id) {
-        return db.queryForMap("SELECT id, nickname, avatar_url AS \"avatarUrl\", phone, bio, role FROM app_user WHERE id = ?", id);
+        return db.queryForMap("SELECT id, nickname, avatar_url AS \"avatarUrl\", phone, bio, role, cover_url AS \"coverUrl\" FROM app_user WHERE id = ?", id);
     }
 
     @PostMapping("/auth/wechat-login")
@@ -105,6 +105,16 @@ public class AccountController {
         return profile(user(auth));
     }
 
+    /** Public allowlist: never expose contact, identity or login fields. */
+    @GetMapping("/users/{id}/profile")
+    public Map<String, Object> publicProfile(@PathVariable String id) {
+        List<Map<String, Object>> rows = db.queryForList("SELECT id,nickname,avatar_url AS \"avatarUrl\",bio,cover_url AS \"coverUrl\" FROM app_user WHERE id=? AND account_status='active'", id);
+        if (rows.isEmpty()) throw new ApiException(HttpStatus.NOT_FOUND, "主页不存在或暂不可访问");
+        Map<String, Object> result = rows.get(0);
+        result.put("postCount", db.queryForObject("SELECT COUNT(*) FROM customer_post WHERE author_id=? AND status='published' AND deleted_at IS NULL", Integer.class, id));
+        return result;
+    }
+
     @PostMapping("/auth/logout")
     public Map<String, Object> logout(@RequestHeader(value = "Authorization", required = false) String auth) {
         user(auth);
@@ -137,8 +147,18 @@ public class AccountController {
     @PostMapping(value = "/users/me/avatar", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public Map<String, Object> avatar(@RequestHeader(value = "Authorization", required = false) String auth,
             @RequestPart("file") MultipartFile file) {
+        return saveProfileImage(auth, file, false);
+    }
+
+    @PostMapping(value = "/users/me/cover", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public Map<String, Object> cover(@RequestHeader(value = "Authorization", required = false) String auth,
+            @RequestPart("file") MultipartFile file) {
+        return saveProfileImage(auth, file, true);
+    }
+
+    private Map<String, Object> saveProfileImage(String auth, MultipartFile file, boolean cover) {
         String id = user(auth);
-        if (file.isEmpty() || file.getSize() > 2 * 1024 * 1024) throw new ApiException(HttpStatus.BAD_REQUEST, "头像不得超过2MB");
+        if (file.isEmpty() || file.getSize() > 2 * 1024 * 1024) throw new ApiException(HttpStatus.BAD_REQUEST, "图片不得超过2MB");
         String type = file.getContentType();
         String extension;
         if ("image/jpeg".equals(type)) extension = ".jpg";
@@ -156,10 +176,10 @@ public class AccountController {
             Files.createDirectories(directory);
             String name = UUID.randomUUID() + extension;
             Files.write(directory.resolve(name), bytes, StandardOpenOption.CREATE_NEW);
-            db.update("UPDATE app_user SET avatar_url = ? WHERE id = ?", "/v1/avatars/" + name, id);
+            db.update("UPDATE app_user SET " + (cover ? "cover_url" : "avatar_url") + " = ? WHERE id = ?", "/v1/avatars/" + name, id);
             return profile(id);
         } catch (ApiException ex) { throw ex; }
-        catch (Exception ex) { throw new ApiException(HttpStatus.INTERNAL_SERVER_ERROR, "头像保存失败"); }
+        catch (Exception ex) { throw new ApiException(HttpStatus.INTERNAL_SERVER_ERROR, "图片保存失败"); }
     }
 
     @GetMapping("/avatars/{name:.+}")

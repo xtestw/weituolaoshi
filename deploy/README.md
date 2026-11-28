@@ -28,6 +28,12 @@ systemctl is-enabled certbot.timer
 
 更新前停止服务并备份 `data` 目录及旧 JAR（H2 文件不能在运行时直接复制作为可靠备份），替换 JAR 后启动并检查日志。数据库迁移后的回滚必须使用匹配的数据库备份。
 
+## 日常更新
+
+在仓库根目录执行 `./deploy/update-server.sh`。脚本会检查工作区、构建管理后台、运行服务端测试并打包，校验上传文件，然后停服备份旧 JAR 和完整 data 目录、更新服务、重启并检查本机 API 与后台页面。备份路径和发布包 SHA-256 会在结束时输出。测试未通过时不会部署。
+
+若明确要发布未提交改动，可加 `--allow-dirty`；若已另行验证且需跳过测试，可加 `--skip-tests`。这两个选项不会绕过构建、备份及线上检查。可用 `DEPLOY_SSH_HOST` 指定其他 SSH 别名。脚本只更新服务端和管理后台，小程序仍需单独发布。
+
 小程序正式 API 已设置为 HTTPS 域名；还需在微信公众平台配置 request、uploadFile、downloadFile 合法域名及 `wss://wtls.xtestw.com` 的 socket 域名。微信 AppSecret 来自服务端已有私有配置，人脸供应商配置当前为空。
 
 ## HTTPS 配置（2026-11-22）

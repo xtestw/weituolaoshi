@@ -57,7 +57,7 @@ public class MarketplaceController {
 
     private Map<String, Object> service(String id) {
         List<Map<String, Object>> rows = db.queryForList("SELECT s.id, s.coser_id, c.display_name AS coser, s.title, " +
-            "s.city, s.price_per_hour, s.min_hours, s.status, s.audit_status, s.visibility, s.deleted_at, " +
+            "s.city, s.price_per_hour, s.price_per_day, s.pricing_unit, s.min_hours, s.status, s.audit_status, s.visibility, s.deleted_at, " +
             "c.verification_status, c.service_status FROM service_post s " +
             "JOIN coser_profile c ON c.user_id = s.coser_id WHERE s.id = ?", id);
         if (rows.isEmpty()) throw new ApiException(HttpStatus.NOT_FOUND, "服务不存在");
@@ -115,7 +115,7 @@ public class MarketplaceController {
     public List<Map<String, Object>> services(@RequestParam(defaultValue="") String q, @RequestParam(defaultValue="") String city) {
         String pattern="%"+q.trim().toLowerCase().replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")+"%";
         return db.queryForList("SELECT s.id, s.title, c.display_name AS coser, s.city, " +
-            "s.price_per_hour AS \"pricePerHour\", s.min_hours AS \"minHours\", s.max_hours AS \"maxHours\", " +
+            "s.price_per_hour AS \"pricePerHour\", s.price_per_day AS \"pricePerDay\", s.pricing_unit AS \"pricingUnit\", s.min_hours AS \"minHours\", s.max_hours AS \"maxHours\", " +
             "s.cover_url AS \"coverUrl\", s.ip_name_snapshot AS \"ipName\", s.character_name_snapshot AS \"characterName\", " +
             "s.service_mode AS \"serviceMode\", " +
             "CASE WHEN c.verification_status='verified' THEN TRUE ELSE FALSE END AS verified, " +
@@ -133,7 +133,7 @@ public class MarketplaceController {
     @GetMapping("/services/{id}")
     public Map<String, Object> serviceDetail(@PathVariable String id) {
         List<Map<String, Object>> rows = db.queryForList("SELECT s.id, s.title, s.description, s.city, s.price_per_hour AS \"pricePerHour\", " +
-            "s.min_hours AS \"minHours\", s.max_hours AS \"maxHours\", s.service_terms AS \"serviceTerms\", s.place_name AS \"place\", " +
+            "s.price_per_day AS \"pricePerDay\", s.pricing_unit AS \"pricingUnit\", s.min_hours AS \"minHours\", s.max_hours AS \"maxHours\", s.service_terms AS \"serviceTerms\", s.place_name AS \"place\", " +
             "s.cover_url AS \"coverUrl\", s.ip_name_snapshot AS \"ipName\", s.character_name_snapshot AS \"characterName\", " +
             "s.service_mode AS \"serviceMode\", c.display_name AS coser, " +
             "CASE WHEN c.verification_status='verified' THEN TRUE ELSE FALSE END AS verified FROM service_post s " +
@@ -161,14 +161,18 @@ public class MarketplaceController {
         requireFemaleAdult(user);
         Integer certified = db.queryForObject("SELECT COUNT(*) FROM coser_profile WHERE user_id=? AND verification_status='verified' AND service_status='active'",Integer.class,user);
         if(certified==null||certified==0) throw new ApiException(HttpStatus.FORBIDDEN,"请先完成Coser认证");
-        int price = integer(body, "pricePerHour");
+        String pricingUnit = String.valueOf(body.getOrDefault("pricingUnit", "hour"));
+        if (!List.of("hour", "day", "both").contains(pricingUnit)) throw new ApiException(HttpStatus.BAD_REQUEST, "计费单位不合法");
+        int hourlyPrice = pricingUnit.equals("day") ? 1 : integer(body, "pricePerHour");
+        Integer dailyPrice = pricingUnit.equals("hour") ? null : integer(body, "pricePerDay");
         int minHours = integer(body, "minHours");
-        if (price <= 0 || minHours < 2 || minHours > 8)
+        if (hourlyPrice <= 0 || (dailyPrice != null && dailyPrice <= 0) || minHours < 2 || minHours > 8)
             throw new ApiException(HttpStatus.BAD_REQUEST, "价格或最小时长不合法");
         String id = "svc-" + UUID.randomUUID();
-        db.update("INSERT INTO service_post(id, coser_id, title, description, city, place_name, price_per_hour, min_hours, status) " +
-            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'draft')", id, user, required(body, "title"),
-            body.getOrDefault("description", ""), required(body, "city"), body.getOrDefault("place", ""), price, minHours);
+        db.update("INSERT INTO service_post(id, coser_id, title, description, city, place_name, price_per_hour, price_per_day, pricing_unit, min_hours, status) " +
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'draft')", id, user, required(body, "title"),
+            body.getOrDefault("description", ""), required(body, "city"), body.getOrDefault("place", ""), hourlyPrice,
+            dailyPrice, pricingUnit, minHours);
         saveLines(id,body.get("boundaries"),"service_boundary",300);
         saveLines(id,body.get("questions"),"service_question",60);
         return service(id);
@@ -178,7 +182,7 @@ public class MarketplaceController {
     public List<Map<String,Object>> myServices(@RequestHeader(value="Authorization",required=false) String bearer,
             @RequestHeader(value="X-Demo-User",required=false) String demo) {
         String user=actor(bearer,demo);
-        List<Map<String,Object>> rows=db.queryForList("SELECT id,title,description,city,place_name AS \"place\",cover_url AS \"coverUrl\",price_per_hour AS \"pricePerHour\",min_hours AS \"minHours\",status FROM service_post WHERE coser_id=? AND deleted_at IS NULL ORDER BY created_at DESC",user);
+        List<Map<String,Object>> rows=db.queryForList("SELECT id,title,description,city,place_name AS \"place\",cover_url AS \"coverUrl\",price_per_hour AS \"pricePerHour\",price_per_day AS \"pricePerDay\",pricing_unit AS \"pricingUnit\",min_hours AS \"minHours\",status FROM service_post WHERE coser_id=? AND deleted_at IS NULL ORDER BY created_at DESC",user);
         for(Map<String,Object> row:rows) {
             String id=(String)row.get("id");
             row.put("boundaries",db.queryForList("SELECT text FROM service_boundary WHERE service_id=? ORDER BY sort_order",String.class,id));
@@ -193,10 +197,13 @@ public class MarketplaceController {
     public Map<String,Object> updateService(@PathVariable String id,@RequestHeader(value="Authorization",required=false) String bearer,
             @RequestHeader(value="X-Demo-User",required=false) String demo,@RequestBody Map<String,Object> body) {
         String user=actor(bearer,demo);
-        int price=integer(body,"pricePerHour"), minHours=integer(body,"minHours");
-        if(price<=0 || minHours<2 || minHours>8) throw new ApiException(HttpStatus.BAD_REQUEST,"价格或时长不合法");
-        int changed=db.update("UPDATE service_post SET title=?,description=?,city=?,place_name=?,price_per_hour=?,min_hours=?,updated_at=CURRENT_TIMESTAMP WHERE id=? AND coser_id=? AND deleted_at IS NULL AND NOT EXISTS (SELECT 1 FROM booking_order o WHERE o.service_id=service_post.id AND o.status NOT IN ('cancelled','completed'))",
-            required(body,"title"),body.getOrDefault("description",""),required(body,"city"),body.getOrDefault("place",""),price,minHours,id,user);
+        String pricingUnit = String.valueOf(body.getOrDefault("pricingUnit", "hour"));
+        if (!List.of("hour", "day", "both").contains(pricingUnit)) throw new ApiException(HttpStatus.BAD_REQUEST, "计费单位不合法");
+        int hourlyPrice=pricingUnit.equals("day") ? 1 : integer(body,"pricePerHour"), minHours=integer(body,"minHours");
+        Integer dailyPrice=pricingUnit.equals("hour") ? null : integer(body,"pricePerDay");
+        if(hourlyPrice<=0 || (dailyPrice != null && dailyPrice<=0) || minHours<2 || minHours>8) throw new ApiException(HttpStatus.BAD_REQUEST,"价格或时长不合法");
+        int changed=db.update("UPDATE service_post SET title=?,description=?,city=?,place_name=?,price_per_hour=?,price_per_day=?,pricing_unit=?,min_hours=?,updated_at=CURRENT_TIMESTAMP WHERE id=? AND coser_id=? AND deleted_at IS NULL AND NOT EXISTS (SELECT 1 FROM booking_order o WHERE o.service_id=service_post.id AND o.status NOT IN ('cancelled','completed'))",
+            required(body,"title"),body.getOrDefault("description",""),required(body,"city"),body.getOrDefault("place",""),hourlyPrice,dailyPrice,pricingUnit,minHours,id,user);
         if(changed==0) throw new ApiException(HttpStatus.CONFLICT,"帖子不存在或已有进行中委托");
         saveLines(id,body.get("boundaries"),"service_boundary",300);
         saveLines(id,body.get("questions"),"service_question",60);
@@ -287,23 +294,27 @@ public class MarketplaceController {
         requireTradable(svc);
         requireFemaleAdults(user, (String) svc.get("coser_id"));
         int hours = integer(body, "durationHours");
-        if (hours < ((Number) svc.get("min_hours")).intValue() || hours > 8)
+        String selectedUnit = String.valueOf(body.getOrDefault("pricingUnit", "both".equals(svc.get("pricing_unit")) ? "hour" : svc.get("pricing_unit")));
+        boolean daily = "day".equals(selectedUnit);
+        if ((!selectedUnit.equals("hour") && !daily) || (daily && "hour".equals(svc.get("pricing_unit"))) ||
+                (!daily && "day".equals(svc.get("pricing_unit"))) || (daily && hours != 24) ||
+                (!daily && (hours < ((Number) svc.get("min_hours")).intValue() || hours > 24)))
             throw new ApiException(HttpStatus.BAD_REQUEST, "预约时长不符合要求");
         LocalDateTime start;
         try { start = LocalDateTime.parse(required(body, "startAt")); }
         catch (Exception ex) { throw new ApiException(HttpStatus.BAD_REQUEST, "startAt格式应为2026-11-16T14:00:00"); }
         LocalDateTime end = start.plusHours(hours);
-        if (!start.toLocalDate().equals(end.toLocalDate()) || start.getHour() < 7 || end.getHour() > 21 ||
-                start.getMinute() != 0 || start.getSecond() != 0 || !start.isAfter(LocalDateTime.now(ZoneId.of("Asia/Shanghai"))))
-            throw new ApiException(HttpStatus.BAD_REQUEST, "仅支持未来上海时间07:00至21:00内的非过夜整点时段");
+        if (start.getMinute() != 0 || start.getSecond() != 0 || !start.isAfter(LocalDateTime.now(ZoneId.of("Asia/Shanghai"))))
+            throw new ApiException(HttpStatus.BAD_REQUEST, "仅支持未来上海时间的整点时段");
         Timestamp startAt = Timestamp.valueOf(start), endAt = Timestamp.valueOf(end);
         requireShortNoticeConfirmation(user, svc, startAt, endAt);
-        long amount = Math.multiplyExact(((Number) svc.get("price_per_hour")).longValue(), hours);
+        long amount = daily ? ((Number) svc.get("price_per_day")).longValue() : Math.multiplyExact(((Number) svc.get("price_per_hour")).longValue(), hours);
         String id = "qt-" + UUID.randomUUID();
         LocalDateTime expiry = LocalDateTime.now().plusMinutes(15);
         db.update("INSERT INTO price_quote(id, customer_id, service_id, start_at, end_at, service_amount, " +
-            "customer_platform_fee, protection_fee, payable_amount, expires_at) VALUES (?, ?, ?, ?, ?, ?, 0, 0, ?, ?)",
-            id, user, svc.get("id"), Timestamp.valueOf(start), Timestamp.valueOf(end), amount, amount, Timestamp.valueOf(expiry));
+            "customer_platform_fee, protection_fee, payable_amount, expires_at, pricing_unit, unit_price_cents) VALUES (?, ?, ?, ?, ?, ?, 0, 0, ?, ?, ?, ?)",
+            id, user, svc.get("id"), Timestamp.valueOf(start), Timestamp.valueOf(end), amount, amount, Timestamp.valueOf(expiry),
+            selectedUnit, daily ? svc.get("price_per_day") : svc.get("price_per_hour"));
         return Map.of("quoteId", id, "serviceId", svc.get("id"), "serviceAmount", amount,
             "customerPlatformFee", 0, "protectionFee", 0, "payableAmount", amount,
             "currency", "CNY", "expiresAt", expiry.toString());
@@ -327,6 +338,14 @@ public class MarketplaceController {
         if (((Timestamp) quote.get("expires_at")).toLocalDateTime().isBefore(LocalDateTime.now()))
             throw new ApiException(HttpStatus.CONFLICT, "报价已过期");
         Map<String, Object> svc = service((String) quote.get("service_id"));
+        String quotedUnit = String.valueOf(quote.get("pricing_unit"));
+        if ((quotedUnit.equals("day") && "hour".equals(svc.get("pricing_unit"))) ||
+                (quotedUnit.equals("hour") && "day".equals(svc.get("pricing_unit"))))
+            throw new ApiException(HttpStatus.CONFLICT, "服务计费方式已变更，请重新获取报价");
+        long currentUnitPrice = ((Number) (quotedUnit.equals("day") ? svc.get("price_per_day") : svc.get("price_per_hour"))).longValue();
+        if (
+                (quote.get("unit_price_cents") != null && ((Number) quote.get("unit_price_cents")).longValue() != currentUnitPrice))
+            throw new ApiException(HttpStatus.CONFLICT, "服务价格已变更，请重新获取报价");
         String coser = (String) svc.get("coser_id");
         // Serialize overlapping bookings for the same Coser, including requests with different keys.
         db.queryForList("SELECT user_id FROM coser_profile WHERE user_id = ? FOR UPDATE", coser);
@@ -334,9 +353,18 @@ public class MarketplaceController {
         requireFemaleAdults(user, coser);
         Timestamp start = (Timestamp) quote.get("start_at");
         Timestamp end = (Timestamp) quote.get("end_at");
-        List<String> windows = db.queryForList("SELECT id FROM availability_slot WHERE coser_id=? AND status='open' " +
-            "AND start_at<=? AND end_at>=? ORDER BY id",String.class,coser,start,end);
-        if (windows.isEmpty()) throw new ApiException(HttpStatus.CONFLICT, "档期不可约");
+        List<Map<String,Object>> windows = db.queryForList("SELECT id,start_at,end_at FROM availability_slot WHERE coser_id=? AND status='open' " +
+            "AND start_at<? AND end_at>? ORDER BY start_at",coser,end,start);
+        LocalDateTime covered = start.toLocalDateTime();
+        String firstWindow = null;
+        for (Map<String,Object> window : windows) {
+            LocalDateTime windowStart = ((Timestamp) window.get("start_at")).toLocalDateTime();
+            LocalDateTime windowEnd = ((Timestamp) window.get("end_at")).toLocalDateTime();
+            if (windowStart.isAfter(covered)) break;
+            if (windowEnd.isAfter(covered)) { if (firstWindow == null) firstWindow = (String) window.get("id"); covered = windowEnd; }
+            if (!covered.isBefore(end.toLocalDateTime())) break;
+        }
+        if (covered.isBefore(end.toLocalDateTime())) throw new ApiException(HttpStatus.CONFLICT, "档期不可约");
         Integer conflicts = db.queryForObject("SELECT COUNT(*) FROM booking_order WHERE coser_id = ? " +
             "AND start_at < ? AND end_at > ? AND status NOT IN ('cancelled', 'refunded') " +
             "AND NOT (status='awaiting_payment' AND payment_expires_at<=CURRENT_TIMESTAMP)", Integer.class, coser, end, start);
@@ -358,14 +386,14 @@ public class MarketplaceController {
         if (!paymentExpiry.plusHours(2).isBefore(occupiedStart.toLocalDateTime())) throw new ApiException(HttpStatus.CONFLICT,"无法在服务开始前完成付款与确认");
         String id = "ord-" + UUID.randomUUID();
         db.update("INSERT INTO booking_order(id, customer_id, coser_id, service_id, quote_id, venue_id, " +
-            "start_at, end_at, payable_amount, status,request_key,service_title_snapshot,seller_name_snapshot,unit_price_cents," +
-            "duration_minutes,payment_expires_at,min_lead_minutes_snapshot) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'awaiting_payment',?,?,?,?,?,?,?)",
+            "start_at, end_at, payable_amount, status,request_key,service_title_snapshot,seller_name_snapshot,unit_price_cents,unit_price_unit," +
+            "duration_minutes,payment_expires_at,min_lead_minutes_snapshot) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'awaiting_payment',?,?,?,?,?,?,?,?)",
             id, user, coser, svc.get("id"), quoteId, venueId, start, end, quote.get("payable_amount"),key,svc.get("title"),svc.get("coser"),
-            svc.get("price_per_hour"),java.time.Duration.between(start.toLocalDateTime(),end.toLocalDateTime()).toMinutes(),
+            quotedUnit.equals("day") ? svc.get("price_per_day") : svc.get("price_per_hour"),quotedUnit,java.time.Duration.between(start.toLocalDateTime(),end.toLocalDateTime()).toMinutes(),
             Timestamp.valueOf(paymentExpiry),policy.get("min_lead_minutes"));
         db.update("INSERT INTO order_appointment(id,order_id,coser_id,availability_id,service_start_at,service_end_at," +
             "buffer_before_minutes,buffer_after_minutes,occupied_start_at,occupied_end_at,timezone_name,status,hold_expires_at) " +
-            "VALUES (?,?,?,?,?,?,?,?,?,?,?,'held',?)","apt-"+UUID.randomUUID(),id,coser,windows.get(0),start,end,before,after,
+            "VALUES (?,?,?,?,?,?,?,?,?,?,?,'held',?)","apt-"+UUID.randomUUID(),id,coser,firstWindow,start,end,before,after,
             occupiedStart,occupiedEnd,"Asia/Shanghai",Timestamp.valueOf(paymentExpiry));
         db.update("INSERT INTO idempotency_record(actor_id, operation, request_key, result_id) VALUES (?, 'create_order', ?, ?)",
             user, key, id);

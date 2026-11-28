@@ -43,7 +43,7 @@
     <view v-else-if="communityError" class="home-empty"><text>社区暂时加载失败</text><button @tap="loadCommunityPosts">重新加载</button></view>
     <template v-else>
       <button v-for="post in communityPosts" :key="post.id" class="story-card" @tap="openCommunity(post)">
-        <text class="story-author">{{ post.author || '社区用户' }} · {{ city }}</text>
+        <text class="story-author" @tap.stop="openAuthor(post.authorId)">{{ post.author || '社区用户' }} · {{ city }}</text>
         <text class="story-title">{{ post.title }}</text>
         <image v-if="post.coverUrl" class="story-cover" :src="post.coverUrl" mode="aspectFill"/>
         <text class="story-body">{{ post.body }}</text>
@@ -92,6 +92,7 @@ onShow() {
 onShareAppMessage() { return { title: '次元委托｜寻找同城可约 Coser', path: '/pages/home/index' } },
 onPullDownRefresh() { this.refresh().finally(() => uni.stopPullDownRefresh()) },
 methods: {
+openAuthor(id) { if (id) uni.navigateTo({ url: `/pages/user-home/index?id=${encodeURIComponent(id)}` }) },
 async refresh() { await Promise.all([this.loadServices(), this.loadCommunityPosts()]) },
 async loadServices() {
   const version = ++this.catalogVersion

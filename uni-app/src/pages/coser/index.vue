@@ -7,9 +7,9 @@
       <view class="service-head__price"><view><text class="price">¥{{ service.price }}</text><text class="service-head__unit">/小时</text></view><text class="service-head__minimum">每单最低 {{ service.minHours || 2 }} 小时</text></view>
     </view>
     <view class="person-row">
-      <view class="avatar">{{ avatar }}</view>
+      <view class="avatar" @tap="openHomepage">{{ avatar }}</view>
       <view class="person-main">
-        <view class="person-name"><text>{{ service.coser }}</text><text v-if="service.verified" class="tag tag--success">真人认证</text></view>
+        <view class="person-name" @tap="openHomepage"><text>{{ service.coser }}</text><text v-if="service.verified" class="tag tag--success">真人认证</text></view>
         <view class="person-meta"><text>{{ service.city || service.district }}</text></view>
       </view>
       <view class="profile-actions"><button :class="favorite ? 'is-favorite' : ''" @tap="toggleFavorite" :aria-label="favorite ? '取消收藏' : '收藏'" :aria-pressed="favorite">{{ favorite ? '已收藏' : '收藏' }}</button><button open-type="share" aria-label="分享主页">分享</button></view>
@@ -123,6 +123,7 @@ onShareAppMessage() {
     return { title: this.service.title, path: `/pages/coser/index?id=${this.serviceId}` }
   },
 methods: {
+openHomepage() { if (this.service.coserId) uni.navigateTo({ url: `/pages/user-home/index?id=${encodeURIComponent(this.service.coserId)}` }); else uni.showToast({ title: '主页暂不可用', icon: 'none' }) },
 refreshReputation() {
     const service = this.service
     const coserId = service.coserId

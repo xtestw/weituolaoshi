@@ -1,19 +1,20 @@
 <view class="page page--no-tab">
-  <view class="section service-summary"><view class="summary-cover"><text>{{service.mark}}</text></view><view><text class="section__title">{{service.title}}</text><text class="muted">{{service.coser}} · {{service.city}} <text wx:if="{{service.verified}}">· 真人认证</text></text><text class="price">¥{{service.price}}<text class="price__unit">/小时</text></text></view></view>
+  <view class="section service-summary"><view class="summary-cover"><text>{{service.mark}}</text></view><view><text class="section__title">{{service.title}}</text><text class="muted">{{service.coser}} · {{service.city}} <text wx:if="{{service.verified}}">· 真人认证</text></text><text class="price">¥{{service.price}}<text class="price__unit">/{{service.pricingUnit === 'day' ? '天' : '小时'}}</text></text><text wx:if="{{service.pricingUnit === 'both'}}"> · ¥{{service.dayPrice}}/天</text></view></view>
 
   <view class="section">
     <view class="section__head"><text class="section__title">时间与时长</text><text class="tag tag--success">档期可约</text></view>
+    <view wx:if="{{service.pricingUnit === 'both'}}" class="line"><text class="line__title">计费方式</text><view class="stepper"><button data-unit="hour" bindtap="selectPricingUnit" disabled="{{selectedPricingUnit === 'hour'}}">按小时</button><button data-unit="day" bindtap="selectPricingUnit" disabled="{{selectedPricingUnit === 'day'}}">按天</button></view></view>
     <picker class="select-row" mode="date" value="{{date}}" bindchange="onDate"><view class="line"><text class="line__title">日期</text><view class="select-row__value"><text>{{date || '请选择日期'}}</text><view class="control-chevron" aria-hidden="true"></view></view></view></picker>
     <picker class="select-row" mode="time" value="{{startTime}}" bindchange="onTime"><view class="line"><text class="line__title">开始时间</text><view class="select-row__value"><text>{{startTime}}</text><view class="control-chevron" aria-hidden="true"></view></view></view></picker>
-    <view class="line"><text class="line__title">服务时长</text><view class="stepper"><button bindtap="decrement" disabled="{{duration <= 2}}" aria-label="减少一小时">−</button><text>{{duration}}小时</text><button bindtap="increment" disabled="{{duration >= 8}}" aria-label="增加一小时">＋</button></view></view>
-    <view class="availability"><view class="availability__bar" style="left: 29%; width: {{duration * 8.3}}%;"></view><view class="availability__ticks"><text>10:00</text><text>14:00</text><text>18:00</text><text>22:00</text></view></view>
+    <view class="line"><text class="line__title">服务时长</text><view wx:if="{{selectedPricingUnit === 'day'}}">1 天（连续 24 小时）</view><view wx:else class="stepper"><button bindtap="decrement" disabled="{{duration <= (service.minHours || 2)}}" aria-label="减少一小时">−</button><text>{{duration}}小时</text><button bindtap="increment" disabled="{{duration >= 24}}" aria-label="增加一小时">＋</button></view></view>
+    <view class="availability"><view class="availability__ticks"><text>今日</text><text>次日</text></view></view>
     <text class="field-help {{isAvailable ? '' : 'field-error'}}">日历已联动展示 {{startTime}} 起连续 {{duration}} 小时；{{isAvailable ? '当前时间段可约。' : '所选时间包含不可约时段，请重新选择。'}}</text>
   </view>
 
   <view class="section">
     <view class="section__head"><text class="section__title">Coser 可约日历</text><text class="caption">24小时档期</text></view>
     <view class="booking-dates"><button wx:for="{{bookingDates}}" wx:key="date" class="booking-date {{date === item.date ? 'booking-date--active' : ''}}" data-date="{{item.date}}" bindtap="selectBookingDate"><text>{{item.label}}</text><text>{{item.week}}</text></button></view>
-    <view class="booking-hours" aria-label="Coser 24小时档期"><view wx:for="{{hours}}" wx:key="label" class="booking-hour {{item.open ? 'booking-hour--open' : 'booking-hour--closed'}} {{item.selected ? 'booking-hour--selected' : ''}}"><text>{{item.label}}</text></view></view>
+    <view class="booking-hours" aria-label="Coser 当日及次日档期"><view wx:for="{{hours}}" wx:key="label" class="booking-hour {{item.open ? 'booking-hour--open' : 'booking-hour--closed'}} {{item.selected ? 'booking-hour--selected' : ''}}"><text>{{item.label}}</text></view></view>
     <view class="calendar-legend"><view><view class="legend-dot legend-dot--open"></view><text>可约</text></view><view><view class="legend-dot legend-dot--selected"></view><text>已选择</text></view><view><view class="legend-dot"></view><text>不可约</text></view></view>
   </view>
 

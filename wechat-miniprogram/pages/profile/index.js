@@ -105,6 +105,7 @@ Page({
     if (this.data.coserVerified) wx.navigateTo({ url: '/pages/b-calendar/index' })
   },
   openFavorites() { wx.navigateTo({ url: '/pages/favorites/index' }) },
+  async openFeedback() { if (!this.data.loggedIn) { const user = await this.loginAccount(); if (!user || !user.avatarUrl || !user.nickname || user.nickname === '微信用户') return } wx.navigateTo({ url: '/pages/feedback/index' }) },
   openHelp() { wx.showModal({ title: '帮助与客服', content: '正式上线时接入微信客服与平台工单。', showCancel: false }) },
   openSafety() { wx.navigateTo({ url: '/pages/safety/index' }) }
 })

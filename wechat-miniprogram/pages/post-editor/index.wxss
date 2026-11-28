@@ -28,6 +28,11 @@ page { background: #f6f5f8; }
 .compose-desc { width: 100%; min-height: 270rpx; padding: 26rpx 0 8rpx; box-sizing: border-box; color: var(--color-text); font-size: 29rpx; line-height: 1.7; }
 .compose-count { display: block; text-align: right; color: var(--color-muted-soft); font-size: 22rpx; }
 .settings-card { margin-top: 20rpx; }
+.pricing-unit { padding: 20rpx 26rpx; display: flex; align-items: center; justify-content: space-between; gap: 16rpx; color: var(--color-text); font-size: 27rpx; font-weight: 700; }
+.pricing-unit > view { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8rpx; }
+.pricing-unit__option { min-width: 110rpx; height: 58rpx; margin: 0; padding: 0 16rpx; border: 1rpx solid var(--color-border); border-radius: 999rpx; background: #fff; color: var(--color-muted); font-size: 24rpx; line-height: 56rpx; }
+.pricing-unit__option--active { border-color: var(--color-primary); background: var(--color-primary-soft); color: var(--color-primary); }
+.pricing-day-hint { display: block; padding: 0 26rpx 20rpx; color: var(--color-muted); font-size: 22rpx; }
 .price-row { display: grid; grid-template-columns: 1.2fr .8fr; }
 .price-field { min-height: 126rpx; padding: 22rpx 26rpx; box-sizing: border-box; }
 .price-field--hours { border-left: 1rpx solid var(--color-border); }

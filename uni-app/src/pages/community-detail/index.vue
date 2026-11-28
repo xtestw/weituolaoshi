@@ -1,8 +1,8 @@
 <template>
 <view class="page" v-if="post">
-  <text class="kind">普通用户 · 社区帖</text>
+  <text class="kind">社区动态</text>
   <view class="title">{{ post.title }}</view>
-  <text class="author">{{ post.author || '用户' }} · {{ post.createdAt }}</text>
+  <text class="author" role="button" @tap="openAuthor(post.authorId)">{{ post.author || '用户' }} · 查看主页 ›</text>
   <view v-if="imageUrls.length" class="gallery">
     <image v-for="(src, index) in imageUrls" :key="index" class="gallery__image" :src="src" mode="aspectFill" :data-index="index" @tap="previewImage"/>
   </view>
@@ -13,7 +13,7 @@
   <view class="comments-head">评论 · {{ comments.length }}</view>
   <view v-if="!comments.length" class="empty">还没有评论，来抢沙发</view>
   <view v-for="item in comments" :key="item.id" class="comment">
-    <view class="comment__meta"><text>{{ item.author || '用户' }}</text><text>{{ item.createdAt }}</text></view>
+    <view class="comment__meta"><text @tap="openAuthor(item.authorId)">{{ item.author || '用户' }} ›</text><text>{{ item.createdAt }}</text></view>
     <view class="comment__body">{{ item.body }}</view>
     <button v-if="item.authorId === meId" class="comment__delete" :data-id="item.id" @tap="removeComment">删除</button>
   </view>
@@ -44,6 +44,7 @@ export default {
     return { title: this.post ? this.post.title : '社区帖子', path: this.post ? `/pages/community-detail/index?id=${this.post.id}` : '/pages/home/index' }
   },
   methods: {
+    openAuthor(id) { if (id) uni.navigateTo({ url: `/pages/user-home/index?id=${encodeURIComponent(id)}` }) },
     previewImage(event) {
       const current = this.imageUrls[Number(event.currentTarget.dataset.index)]
       uni.previewImage({ current, urls: this.imageUrls })

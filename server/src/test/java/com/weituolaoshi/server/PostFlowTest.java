@@ -33,7 +33,7 @@ class PostFlowTest {
     mvc.perform(get("/v1/posts?q=漫展")).andExpect(status().isOk()).andExpect(jsonPath("$[0].id").value(id));
     mvc.perform(get("/v1/posts/"+id)).andExpect(status().isOk());
     mvc.perform(get("/v1/services?q=测试漫展记录")).andExpect(status().isOk()).andExpect(jsonPath("$.length()").value(0));
-    mvc.perform(post("/v1/posts").header("Authorization",coser).contentType(MediaType.APPLICATION_JSON).content("{\"title\":\"不应发布\",\"body\":\"Coser内容\"}")).andExpect(status().isForbidden());
+    mvc.perform(post("/v1/posts").header("Authorization",coser).contentType(MediaType.APPLICATION_JSON).content("{\"title\":\"Coser动态\",\"body\":\"Coser内容\"}")).andExpect(status().isOk());
     mvc.perform(delete("/v1/posts/"+id).header("Authorization",coser)).andExpect(status().isNotFound());
     mvc.perform(delete("/v1/posts/"+id).header("Authorization",customer)).andExpect(status().isOk());
     mvc.perform(get("/v1/posts/"+id)).andExpect(status().isNotFound());

@@ -3,7 +3,7 @@
     <view class="service-head">
       <text class="service-head__eyebrow">角色委托 · {{service.district}}</text>
       <text class="service-head__title">{{service.title}}</text>
-      <view class="service-head__price"><view><text class="price">¥{{service.price}}</text><text class="service-head__unit">/小时</text></view><text class="service-head__minimum">每单最低 {{service.minHours || 2}} 小时</text></view>
+      <view class="service-head__price"><view><text class="price">¥{{service.price}}</text><text class="service-head__unit">/{{service.pricingUnit === 'day' ? '天' : '小时'}}</text><text wx:if="{{service.pricingUnit === 'both'}}" class="service-head__unit"> · ¥{{service.dayPrice}}/天</text></view><text class="service-head__minimum">{{service.pricingUnit === 'day' ? '连续24小时' : '每单最低 ' + (service.minHours || 2) + ' 小时，最多24小时'}}</text></view>
     </view>
     <view class="person-row">
       <view class="avatar">{{avatar}}</view>
@@ -40,7 +40,7 @@
   <view class="section">
     <view class="section__head"><text class="section__title">相处偏好与边界</text></view>
     <view class="boundary-chips"><text wx:for="{{boundaries}}" wx:key="*this" class="boundary-chip">{{item}}</text></view>
-    <text class="boundary-note">仅限公开场所，不接受酒店、住宅、过夜或订单外要求。下单时将逐条确认，以双方更严格的边界为准。</text>
+    <text class="boundary-note">仅限公开场所，不接受酒店、住宅、住宿或订单外要求。跨日预约仍需遵守公共场所与双方确认的边界。</text>
   </view>
 
   <view class="section schedule-section">
@@ -50,7 +50,7 @@
     </button>
     <view wx:if="{{scheduleOpen}}" class="schedule-content">
       <view class="dates"><button wx:for="{{dates}}" wx:key="key" class="date {{selectedDateKey === item.key ? 'date--active' : ''}} {{!item.open ? 'date--closed' : ''}}" data-index="{{index}}" bindtap="selectDate" disabled="{{!item.open}}" aria-label="{{item.full}}，{{item.open ? '可约' : '不可约'}}"><text>{{item.label}}</text><text class="date__sub">{{item.open ? '可约' : '不可约'}}</text></button></view>
-      <view class="available-copy">按日期展示可约状态。具体开始时间与服务时长在下单时填写，仅可预约 10:00–22:00 内的时段。</view>
+      <view class="available-copy">按日期展示可约状态。具体开始时间与服务时长在下单时填写，跨日预约需连续开放档期。</view>
     </view>
   </view>
 </view>

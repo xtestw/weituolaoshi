@@ -1,0 +1,16 @@
+---
+description: 小程序功能只改 uni-app，不要改原生 wechat-miniprogram
+alwaysApply: true
+---
+
+# 小程序源码以 uni-app 为准
+
+- 微信小程序相关改动（页面、组件、样式、业务逻辑、API 接入、配置）一律修改 `uni-app/`，不要改 `wechat-miniprogram/`。
+- `wechat-miniprogram/` 是历史原生工程，仅作参考或迁移对照；不要在其中加功能、修 bug 或同步改动。
+- 开发/预览：在 `uni-app` 下执行 `npm run dev:mp-weixin`，用微信开发者工具导入 `uni-app/dist/dev/mp-weixin`。
+- 不要运行 `uni-app/migrate.py` 覆盖现有 Vue 源码，除非用户明确要求从原生工程重新迁移。
+
+```text
+✅ 改 uni-app/src/pages/.../*.vue
+❌ 改 wechat-miniprogram/pages/.../*
+```

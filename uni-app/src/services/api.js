@@ -78,6 +78,18 @@ function uploadAvatar(filePath) {
     fail: reject
   }))
 }
+function uploadCover(filePath) {
+  const token = uni.getStorageSync('account_token')
+  if (!token) return Promise.reject(new Error('请先登录'))
+  return new Promise((resolve, reject) => uni.uploadFile({
+    url: `${app().globalData.apiBaseUrl}/v1/users/me/cover`, filePath, name: 'file',
+    header: { Authorization: `Bearer ${token}` },
+    success: ({ statusCode, data }) => {
+      let result = {}; try { result = JSON.parse(data) } catch (_) {}
+      statusCode >= 200 && statusCode < 300 ? resolve(result) : reject(new Error(result.message || '封面上传失败'))
+    }, fail: reject
+  }))
+}
 function uploadServiceImage(serviceId, filePath) {
   const base = app().globalData.apiBaseUrl
   const token = uni.getStorageSync('account_token')
@@ -114,4 +126,4 @@ function mediaUrl(url) {
   }
   return url
 }
-export { request, createPayment, verifyIdentity, wechatLogin, currentUser, logout, clearAccount, uploadAvatar, uploadServiceImage, uploadCommunityImage, mediaUrl }
+export { uploadCover, request, createPayment, verifyIdentity, wechatLogin, currentUser, logout, clearAccount, uploadAvatar, uploadServiceImage, uploadCommunityImage, mediaUrl }

@@ -10,7 +10,7 @@
   <block wx:if="{{verified}}">
     <view class="section posts"><view class="section__head"><text class="section__title">我的帖子 · {{posts.length}}</text></view>
       <view wx:if="{{!posts.length}}" class="empty"><text>还没有帖子，发布第一篇角色服务吧</text></view>
-      <view wx:for="{{posts}}" wx:key="id" class="post"><view class="post__cover">{{item.coverMark || 'COS'}}</view><view class="post__copy"><text>{{item.title}}</text><text>¥{{item.price}}/小时 · 最低{{item.minHours}}小时</text><text class="{{item.locked ? 'locked' : ''}}">{{item.locked ? '进行中 · 已锁定' : item.statusText}}</text></view><view class="post__tools"><button data-index="{{index}}" bindtap="edit">编辑</button><button data-index="{{index}}" bindtap="remove">删除</button></view></view>
+      <view wx:for="{{posts}}" wx:key="id" class="post"><view class="post__cover">{{item.coverMark || 'COS'}}</view><view class="post__copy"><text>{{item.title}}</text><text>{{item.pricingUnit === 'day' ? '' : '¥' + item.price + '/小时'}}{{item.pricingUnit === 'both' ? ' · ' : ''}}{{item.pricingUnit === 'hour' ? '' : '¥' + item.dayPrice + '/天'}}</text><text class="{{item.locked ? 'locked' : ''}}">{{item.locked ? '进行中 · 已锁定' : item.statusText}}</text></view><view class="post__tools"><button data-index="{{index}}" bindtap="edit">编辑</button><button data-index="{{index}}" bindtap="remove">删除</button></view></view>
     </view>
   </block>
 </view>

@@ -17,27 +17,25 @@ import org.springframework.stereotype.Component;
 @Component
 public class AvailabilitySupport {
     public static final ZoneId ZONE = ZoneId.of("Asia/Shanghai");
-    public static final LocalTime WINDOW_START = LocalTime.of(10, 0);
-    public static final LocalTime WINDOW_END = LocalTime.of(22, 0);
-    public static final String WINDOW_LABEL = "10:00–22:00";
+    public static final LocalTime WINDOW_START = LocalTime.MIDNIGHT;
+    public static final LocalTime WINDOW_END = LocalTime.MIDNIGHT;
+    public static final String WINDOW_LABEL = "00:00–次日00:00";
 
     private final JdbcTemplate db;
 
     public AvailabilitySupport(JdbcTemplate db) { this.db = db; }
 
     public Timestamp dayWindowStart(LocalDate day) { return Timestamp.valueOf(day.atTime(WINDOW_START)); }
-    public Timestamp dayWindowEnd(LocalDate day) { return Timestamp.valueOf(day.atTime(WINDOW_END)); }
+    public Timestamp dayWindowEnd(LocalDate day) { return Timestamp.valueOf(day.plusDays(1).atStartOfDay()); }
 
     public void requireServiceWindow(LocalDateTime start, LocalDateTime end) {
-        if (!start.toLocalDate().equals(end.toLocalDate())
-            || start.getMinute() != 0 || start.getSecond() != 0 || start.getNano() != 0
+        if (start.getMinute() != 0 || start.getSecond() != 0 || start.getNano() != 0
             || end.getMinute() != 0 || end.getSecond() != 0 || end.getNano() != 0
-            || start.toLocalTime().isBefore(WINDOW_START)
-            || end.toLocalTime().isAfter(WINDOW_END)
+            || java.time.Duration.between(start,end).toHours() > 24
             || !end.isAfter(start)
             || !start.isAfter(LocalDateTime.now(ZONE)))
             throw new ApiException(HttpStatus.BAD_REQUEST,
-                "仅支持未来上海时间" + WINDOW_LABEL + "内的非过夜整点时段");
+                "仅支持未来上海时间最长24小时的整点时段");
     }
 
     public List<Map<String, Object>> openWindows(String coserId, Timestamp start, Timestamp end) {

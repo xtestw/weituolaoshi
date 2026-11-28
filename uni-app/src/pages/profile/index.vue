@@ -1,10 +1,11 @@
 <template>
 <view class="safe-top profile-head"><view class="profile-head__bar"><text>我的</text></view><view class="person"><view class="avatar"><image v-if="accountAvatar" :src="accountAvatar" mode="aspectFill" aria-label="账号头像"/><text v-else>{{ accountInitial }}</text></view><view><view class="person__identity"><text v-if="loggedIn" class="person__name">{{ accountName }}</text><text v-else class="person__name person__name--login" role="button" aria-label="登录" @tap="loginAccount">{{ loginLoading ? '登录中…' : '登录 ›' }}</text><view v-if="loggedIn && coserVerified && role === 'coser'" class="coser-status" aria-label="Coser已认证"><text aria-hidden="true">✓</text></view></view><text class="muted">{{ loggedIn ? (verified ? (eligible ? '已成年 · 可下单' : '已核验 · 仅可浏览') : '未实名认证 · 可浏览') : '登录后可同步账号与委托' }}</text><button v-if="loggedIn" class="profile-edit-trigger" @tap="editProfile">编辑个人资料 ›</button></view></view><text v-if="authError" class="profile-auth-error">{{ authError }}</text></view>
 <view class="page profile-page">
+  <button v-if="loggedIn" class="entry" @tap="openHomepage"><view class="entry__mark">我</view><view><text>我的个人主页</text><text>分享日常 · 管理公开动态</text></view><text>›</text></button>
   <template v-if="role === 'customer'">
     <view class="section commission"><view class="section__head"><text class="section__title">我的委托</text><button @tap="openOrders">全部委托 ›</button></view><view class="status-grid"><button data-tab="confirm" @tap="openOrders"><view class="status-icon status-icon--clock"></view><text>待确认</text><text v-if="confirmCount" class="count">{{ confirmCount }}</text></button><button data-tab="pay" @tap="openOrders"><view class="status-icon status-icon--card"></view><text>待支付</text><text v-if="payCount" class="count">{{ payCount }}</text></button><button data-tab="service" @tap="openOrders"><view class="status-icon status-icon--calendar"></view><text>待履约</text><text v-if="serviceCount" class="count">{{ serviceCount }}</text></button><button data-tab="review" @tap="openOrders"><view class="status-icon status-icon--heart"></view><text>待评价</text><text v-if="reviewCount" class="count">{{ reviewCount }}</text></button></view></view>
     <button class="entry" @tap="openFavorites"><view class="entry__mark">收</view><view><text>我的收藏</text><text>{{ favorites }}个心仪委托</text></view><text>›</text></button>
-    <button class="entry" @tap="openCommunityPosts"><view class="entry__mark">帖</view><view><text>我的社区帖子</text><text>发布与管理普通用户内容</text></view><text>›</text></button>
+    <button class="entry" @tap="openCommunityPosts"><view class="entry__mark">帖</view><view><text>我的社区帖子</text><text>管理动态、社区帖与草稿</text></view><text>›</text></button>
     <view class="section menu"><button @tap="openCoser"><text>我是 Coser</text><text>进入 Coser 端 ›</text></button><button @tap="openVerification"><text>实名认证</text><text>{{ verified ? '已完成' : '去认证' }} ›</text></button><button @tap="openSafety"><text>安全中心</text><text>{{ emergencyContactSet ? '已设置紧急联系人' : '设置紧急联系人' }} ›</text></button><button @tap="openHelp"><text>帮助与客服</text><text>›</text></button></view>
   </template>
   <template v-else>
@@ -35,6 +36,7 @@
     <view class="section menu"><button @tap="backToCustomer"><text>返回用户菜单</text><text>›</text></button></view>
     </template>
   </template>
+  <view class="section menu"><button @tap="openFeedback"><text>用户反馈</text><text>建议、问题与截图 ›</text></button></view>
   <button v-if="loggedIn" class="profile-logout" :loading="logoutLoading" :disabled="logoutLoading" @tap="exitAccount">退出登录</button>
 </view>
 
@@ -82,6 +84,7 @@ onShow() {
     }
   },
 methods: {
+openHomepage() { const user = uni.getStorageSync('account_user') || {}; if (user.id) uni.navigateTo({ url: `/pages/user-home/index?id=${encodeURIComponent(user.id)}` }) },
 openCommunityPosts() { if (!this.loggedIn) return this.loginAccount(); uni.navigateTo({ url: '/pages/community-mine/index' }) },
 needsProfileSetup(user) { return !!user && (!user.avatarUrl || !user.nickname || user.nickname === '微信用户') },
 openProfileSetup() { uni.navigateTo({ url: '/pages/profile-edit/index?firstLogin=1' }) },
@@ -194,6 +197,7 @@ openBCalendar() {
     if (this.coserVerified) uni.navigateTo({ url: '/pages/b-calendar/index' })
   },
 openFavorites() { uni.navigateTo({ url: '/pages/favorites/index' }) },
+async openFeedback() { if (!this.loggedIn) { const user = await this.loginAccount(); if (!user || this.needsProfileSetup(user)) return } uni.navigateTo({ url: '/pages/feedback/index' }) },
 openHelp() { uni.showModal({ title: '帮助与客服', content: '正式上线时接入微信客服与平台工单。', showCancel: false }) },
 openSafety() { uni.navigateTo({ url: '/pages/safety/index' }) },
 setData(patch, callback) { Object.assign(this.$data, patch); if (callback) this.$nextTick(() => callback.call(this)) }

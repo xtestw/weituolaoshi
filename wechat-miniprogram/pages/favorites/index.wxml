@@ -4,7 +4,7 @@
     <view wx:for="{{items}}" wx:key="id" class="favorite-card">
       <button class="favorite-card__main" data-id="{{item.id}}" bindtap="openService">
         <view class="favorite-card__cover favorite-card__cover--{{item.tone}}"><text>{{item.mark}}</text></view>
-        <view class="favorite-card__info"><text class="favorite-card__title">{{item.title}}</text><text class="caption">{{item.coser}} · 上海{{item.district}} · {{item.gender}}</text><text class="price">¥{{item.price}}<text class="price__unit">/小时</text></text></view>
+        <view class="favorite-card__info"><text class="favorite-card__title">{{item.title}}</text><text class="caption">{{item.coser}} · {{item.city || '上海'}}{{item.district}} · {{item.gender}}</text><text class="price">¥{{item.price}}<text class="price__unit">/{{item.pricingUnit === 'day' ? '天' : '小时'}}</text><text wx:if="{{item.pricingUnit === 'both'}}" class="price__unit"> · ¥{{item.dayPrice}}/天</text></text></view>
       </button>
       <button class="favorite-card__remove" data-id="{{item.id}}" bindtap="removeFavorite">取消收藏</button>
     </view>
