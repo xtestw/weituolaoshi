@@ -53,6 +53,8 @@ class CoserWorkbenchTest {
         String id = order.get("id").asText();
         mvc.perform(post("/v1/dev/orders/"+id+"/pay").header("Authorization","Bearer "+customer))
             .andExpect(status().isOk());
+        mvc.perform(get("/v1/coser/orders").header("Authorization","Bearer "+coser))
+            .andExpect(status().isOk()).andExpect(jsonPath("$[?(@.id=='"+id+"')].status").value("awaiting_coser"));
 
         JsonNode dashboard = parse(mvc.perform(get("/v1/coser/dashboard").header("Authorization","Bearer "+coser))
             .andExpect(status().isOk()).andReturn());
@@ -73,6 +75,8 @@ class CoserWorkbenchTest {
             .andExpect(status().isOk());
         mvc.perform(post("/v1/orders/"+id+"/complete-confirmations").header("Authorization","Bearer "+coser))
             .andExpect(status().isOk()).andExpect(jsonPath("$.status").value("completed"));
+        mvc.perform(get("/v1/coser/orders").header("Authorization","Bearer "+coser))
+            .andExpect(status().isOk()).andExpect(jsonPath("$[?(@.id=='"+id+"')].status").value("completed"));
 
         mvc.perform(post("/v1/orders/"+id+"/reviews").header("Authorization","Bearer "+customer)
             .contentType(MediaType.APPLICATION_JSON).content("{\"score\":5,\"body\":\"很好\"}"))

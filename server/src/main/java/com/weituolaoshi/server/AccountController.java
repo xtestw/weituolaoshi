@@ -22,6 +22,8 @@ public class AccountController {
     private final JdbcTemplate db;
     private final ObjectMapper json;
     private final RestTemplate http = new RestTemplate();
+    private volatile String wechatAccessToken;
+    private volatile long wechatAccessTokenExpiresAt;
     @Value("${wechat.app-id:}") private String appId;
     @Value("${wechat.app-secret:}") private String appSecret;
     @Value("${account.avatar-directory:./data/avatars}") private String avatarDirectory;
@@ -47,7 +49,7 @@ public class AccountController {
     }
 
     private Map<String, Object> profile(String id) {
-        return db.queryForMap("SELECT id, nickname, avatar_url AS \"avatarUrl\", phone, bio, role, cover_url AS \"coverUrl\" FROM app_user WHERE id = ?", id);
+        return db.queryForMap("SELECT id, nickname, avatar_url AS \"avatarUrl\", phone, phone_verified_at IS NOT NULL AS \"phoneVerified\", bio, role, cover_url AS \"coverUrl\" FROM app_user WHERE id = ?", id);
     }
 
     @PostMapping("/auth/wechat-login")
@@ -105,6 +107,52 @@ public class AccountController {
         return profile(user(auth));
     }
 
+    private synchronized String accessToken() {
+        if (wechatAccessToken != null && System.currentTimeMillis() < wechatAccessTokenExpiresAt) return wechatAccessToken;
+        try {
+            String url = "https://api.weixin.qq.com/cgi-bin/token?grant_type=client_credential&appid=" +
+                java.net.URLEncoder.encode(appId, "UTF-8") + "&secret=" + java.net.URLEncoder.encode(appSecret, "UTF-8");
+            Map<?,?> result = json.readValue(http.getForObject(url, String.class), Map.class);
+            Object token = result.get("access_token");
+            if (!(token instanceof String) || ((String) token).isBlank()) throw new IllegalStateException("missing access token");
+            int expires = result.get("expires_in") instanceof Number ? ((Number) result.get("expires_in")).intValue() : 7200;
+            wechatAccessToken = (String) token;
+            wechatAccessTokenExpiresAt = System.currentTimeMillis() + Math.max(60, expires - 300) * 1000L;
+            return wechatAccessToken;
+        } catch (Exception ex) {
+            log.warn("WeChat access token request failed: {}", ex.getClass().getSimpleName());
+            throw new ApiException(HttpStatus.BAD_GATEWAY, "微信手机号服务暂不可用");
+        }
+    }
+
+    @PostMapping("/users/me/wechat-phone")
+    public Map<String,Object> bindWechatPhone(@RequestHeader(value="Authorization", required=false) String authorization,
+            @RequestBody Map<String,Object> body) {
+        String id = user(authorization);
+        Object code = body.get("code");
+        if (!(code instanceof String) || ((String) code).isBlank())
+            throw new ApiException(HttpStatus.BAD_REQUEST, "请重新授权获取手机号");
+        if (appId.isBlank() || appSecret.isBlank())
+            throw new ApiException(HttpStatus.SERVICE_UNAVAILABLE, "微信手机号服务尚未配置");
+        try {
+            String url = "https://api.weixin.qq.com/wxa/business/getuserphonenumber?access_token=" +
+                java.net.URLEncoder.encode(accessToken(), "UTF-8");
+            Map<?,?> result = http.postForObject(url, Map.of("code", code), Map.class);
+            if (result == null || !(result.get("phone_info") instanceof Map))
+                throw new ApiException(HttpStatus.BAD_REQUEST, "手机号授权已失效，请重新授权");
+            Map<?,?> info = (Map<?,?>) result.get("phone_info");
+            String phone = String.valueOf(info.get("purePhoneNumber"));
+            if (!"86".equals(String.valueOf(info.get("countryCode"))) || !phone.matches("1[3-9]\\d{9}"))
+                throw new ApiException(HttpStatus.BAD_REQUEST, "当前仅支持中国大陆手机号");
+            db.update("UPDATE app_user SET phone=?,phone_verified_at=CURRENT_TIMESTAMP WHERE id=?", phone, id);
+            return profile(id);
+        } catch (ApiException ex) { throw ex; }
+        catch (Exception ex) {
+            log.warn("WeChat phone exchange failed: {}", ex.getClass().getSimpleName());
+            throw new ApiException(HttpStatus.BAD_GATEWAY, "微信手机号服务暂不可用");
+        }
+    }
+
     /** Public allowlist: never expose contact, identity or login fields. */
     @GetMapping("/users/{id}/profile")
     public Map<String, Object> publicProfile(@PathVariable String id) {
@@ -140,7 +188,7 @@ public class AccountController {
             throw new ApiException(HttpStatus.BAD_REQUEST, "请输入有效的11位手机号");
         if (bio != null && bio.length() > 500)
             throw new ApiException(HttpStatus.BAD_REQUEST, "个人简介不能超过500字");
-        db.update("UPDATE app_user SET nickname = ?, phone = ?, bio = ? WHERE id = ?", ((String) value).trim(), phone == null || phone.isEmpty() ? null : phone, bio == null || bio.isEmpty() ? null : bio, id);
+        db.update("UPDATE app_user SET nickname = ?, phone = ?, bio = ?, phone_verified_at = CASE WHEN phone IS NOT DISTINCT FROM ? THEN phone_verified_at ELSE NULL END WHERE id = ?", ((String) value).trim(), phone == null || phone.isEmpty() ? null : phone, bio == null || bio.isEmpty() ? null : bio, phone == null || phone.isEmpty() ? null : phone, id);
         return profile(id);
     }
 

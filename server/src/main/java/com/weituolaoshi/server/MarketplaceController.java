@@ -25,10 +25,11 @@ public class MarketplaceController {
     private final JdbcTemplate db;
     private final AuthSupport auth;
     private final IdentityGenderPolicy genderPolicy;
+    private final AvailabilitySupport availabilitySupport;
     private final Environment environment;
     @Value("${orders.checkin-directory:./data/checkins}") private String checkinDirectory;
     @Value("${posts.media-directory:./data/posts}") private String postMediaDirectory;
-    public MarketplaceController(JdbcTemplate db, AuthSupport auth, Environment environment, IdentityGenderPolicy genderPolicy) { this.db = db; this.auth = auth; this.environment = environment; this.genderPolicy = genderPolicy; }
+    public MarketplaceController(JdbcTemplate db, AuthSupport auth, Environment environment, IdentityGenderPolicy genderPolicy, AvailabilitySupport availabilitySupport) { this.db = db; this.auth = auth; this.environment = environment; this.genderPolicy = genderPolicy; this.availabilitySupport = availabilitySupport; }
 
     private String required(Map<String, Object> body, String key) {
         Object value = body.get(key);
@@ -268,13 +269,7 @@ public class MarketplaceController {
     @GetMapping("/cosers/{id}/availability")
     public Map<String, Object> availability(@PathVariable String id) {
         Map<String, Object> svc = service(id);
-        List<Map<String, Object>> slots = db.queryForList("SELECT id, start_at AS \"startAt\", end_at AS \"endAt\" " +
-            "FROM availability_slot WHERE coser_id = ? AND status = 'open' AND end_at > ? ORDER BY start_at",
-            svc.get("coser_id"), Timestamp.valueOf(LocalDateTime.now(ZoneId.of("Asia/Shanghai"))));
-        for (Map<String,Object> slot : slots) {
-            slot.put("startAt", ((Timestamp)slot.get("startAt")).toLocalDateTime().toString());
-            slot.put("endAt", ((Timestamp)slot.get("endAt")).toLocalDateTime().toString());
-        }
+        List<Map<String, Object>> slots = availabilitySupport.availableSlots((String) svc.get("coser_id"), LocalDateTime.now(ZoneId.of("Asia/Shanghai")));
         return Map.of("serviceId", id, "slots", slots);
     }
 
@@ -308,6 +303,30 @@ public class MarketplaceController {
             throw new ApiException(HttpStatus.BAD_REQUEST, "仅支持未来上海时间的整点时段");
         Timestamp startAt = Timestamp.valueOf(start), endAt = Timestamp.valueOf(end);
         requireShortNoticeConfirmation(user, svc, startAt, endAt);
+        String coser = (String) svc.get("coser_id");
+        List<Map<String,Object>> windows = db.queryForList("SELECT start_at,end_at FROM availability_slot " +
+            "WHERE coser_id=? AND status='open' AND start_at<? AND end_at>? ORDER BY start_at", coser, endAt, startAt);
+        LocalDateTime covered = start;
+        for (Map<String,Object> window : windows) {
+            LocalDateTime windowStart = ((Timestamp) window.get("start_at")).toLocalDateTime();
+            LocalDateTime windowEnd = ((Timestamp) window.get("end_at")).toLocalDateTime();
+            if (windowStart.isAfter(covered)) break;
+            if (windowEnd.isAfter(covered)) covered = windowEnd;
+            if (!covered.isBefore(end)) break;
+        }
+        if (covered.isBefore(end)) throw new ApiException(HttpStatus.CONFLICT, "档期不可约");
+        Integer conflicts = db.queryForObject("SELECT COUNT(*) FROM booking_order WHERE coser_id=? " +
+            "AND start_at<? AND end_at>? AND status NOT IN ('cancelled','refunded') " +
+            "AND NOT (status='awaiting_payment' AND payment_expires_at<=CURRENT_TIMESTAMP)",
+            Integer.class, coser, endAt, startAt);
+        if (conflicts != null && conflicts > 0) throw new ApiException(HttpStatus.CONFLICT, "档期已被其他订单占用");
+        Map<String,Object> policy = db.queryForMap("SELECT buffer_before_minutes,buffer_after_minutes FROM coser_profile WHERE user_id=?", coser);
+        Timestamp occupiedStart = Timestamp.valueOf(start.minusMinutes(((Number) policy.get("buffer_before_minutes")).intValue()));
+        Timestamp occupiedEnd = Timestamp.valueOf(end.plusMinutes(((Number) policy.get("buffer_after_minutes")).intValue()));
+        Integer overlaps = db.queryForObject("SELECT COUNT(*) FROM order_appointment WHERE coser_id=? AND occupied_start_at<? AND occupied_end_at>? " +
+            "AND (status IN ('confirmed','in_service') OR (status='held' AND hold_expires_at>CURRENT_TIMESTAMP) " +
+            "OR (status='awaiting_coser' AND confirm_expires_at>CURRENT_TIMESTAMP))", Integer.class, coser, occupiedEnd, occupiedStart);
+        if (overlaps != null && overlaps > 0) throw new ApiException(HttpStatus.CONFLICT, "档期已被占用");
         long amount = daily ? ((Number) svc.get("price_per_day")).longValue() : Math.multiplyExact(((Number) svc.get("price_per_hour")).longValue(), hours);
         String id = "qt-" + UUID.randomUUID();
         LocalDateTime expiry = LocalDateTime.now().plusMinutes(15);
@@ -562,6 +581,8 @@ public class MarketplaceController {
         if (count!=null && count==2) {
             db.update("UPDATE booking_order SET status='completed',completion_submitted_at=CURRENT_TIMESTAMP WHERE id=?",id);
             db.update("UPDATE order_appointment SET status='ended',actual_end_at=CURRENT_TIMESTAMP WHERE order_id=?",id);
+            CoserWorkbenchController.createSettlement(db, id, (String) order.get("coser_id"),
+                ((Number) order.get("paid_amount")).longValue());
             db.update("INSERT INTO order_event(id,order_id,actor_id,action,from_status,to_status) VALUES (?,?,?,'complete','in_service','completed')",
                 "evt-"+UUID.randomUUID(),id,user);
         }

@@ -7,7 +7,7 @@
   </view>
   <view class="profile-card profile-fields">
     <view class="profile-field-row"><text class="profile-row-title">昵称</text><input type="nickname" :value="draftNickname" maxlength="30" @input="onNickname" :placeholder="firstLogin ? '点击选择微信昵称' : '填写昵称'"/></view>
-    <view class="profile-field-row"><view><text class="profile-row-title">手机号</text><text class="profile-row-hint">未验证 · 选填</text></view><input type="number" :value="draftPhone" maxlength="11" @input="onPhone" placeholder="填写手机号"/></view>
+    <view class="profile-field-row"><view><text class="profile-row-title">手机号</text><text class="profile-row-hint">{{ phoneVerified ? '微信已验证' : '未验证 · 选填' }}</text></view><view class="phone-bind"><text>{{ draftPhone || '尚未绑定' }}</text><button open-type="getPhoneNumber" :disabled="phoneBinding" @getphonenumber="onGetPhoneNumber">{{ phoneBinding ? '绑定中…' : (draftPhone ? '更换' : '微信授权') }}</button></view></view>
     <view class="profile-bio-row"><text class="profile-row-title">个人简介</text><textarea :value="draftBio" maxlength="500" @input="onBio" placeholder="介绍一下自己（选填）"/></view>
   </view>
   <text v-if="authError" class="profile-edit-error">{{ authError }}</text>
@@ -17,7 +17,7 @@
 <script>
 import { request, uploadAvatar } from '../../services/api'
 export default {
-  data() { return { draftNickname: '', draftPhone: '', draftBio: '', draftAvatar: '', accountAvatar: '', accountInitial: '我', profileSaving: false, authError: '', firstLogin: false } },
+  data() { return { draftNickname: '', draftPhone: '', phoneVerified: false, phoneBinding: false, draftBio: '', draftAvatar: '', accountAvatar: '', accountInitial: '我', profileSaving: false, authError: '', firstLogin: false } },
   onLoad(options) {
     if (!uni.getStorageSync('account_token')) return uni.navigateBack()
     const user = uni.getStorageSync('account_user') || {}
@@ -26,28 +26,41 @@ export default {
     this.firstLogin = options.firstLogin === '1' || !avatar || name === '微信用户'
     this.draftNickname = name === '微信用户' ? '' : name
     this.draftPhone = user.phone || ''
+    this.phoneVerified = !!user.phoneVerified
     this.draftBio = user.bio || ''
     this.accountInitial = name.slice(0, 1)
     this.accountAvatar = avatar.startsWith('/') ? `${getApp().globalData.apiBaseUrl}${avatar}` : avatar
   },
   methods: {
     onNickname(event) { this.draftNickname = event.detail.value },
-    onPhone(event) { this.draftPhone = event.detail.value },
+    async onGetPhoneNumber(event) {
+      const code = event.detail && event.detail.code
+      if (!code) { this.authError = '未授权手机号，请重试'; return }
+      if (this.phoneBinding) return
+      this.phoneBinding = true
+      this.authError = ''
+      try {
+        const user = await request('/v1/users/me/wechat-phone', { method: 'POST', data: { code } })
+        this.draftPhone = user.phone || ''
+        this.phoneVerified = !!user.phoneVerified
+        uni.setStorageSync('account_user', user)
+        uni.showToast({ title: '手机号已绑定', icon: 'success' })
+      } catch (error) { this.authError = error.message || '手机号绑定失败，请重试' }
+      finally { this.phoneBinding = false }
+    },
     onBio(event) { this.draftBio = event.detail.value },
     onChooseAvatar(event) { if (event.detail.avatarUrl) this.draftAvatar = event.detail.avatarUrl },
     async saveProfile() {
       if (this.profileSaving) return
       const nickname = this.draftNickname.trim()
-      const phone = this.draftPhone.trim()
       const bio = this.draftBio.trim()
       if (!nickname || nickname.length > 30) return this.authError = '昵称长度须为1至30字'
-      if (phone && !/^1[3-9]\d{9}$/.test(phone)) return this.authError = '请输入有效的11位手机号'
       if (bio.length > 500) return this.authError = '个人简介不能超过500字'
       if (this.firstLogin && !this.draftAvatar && !this.accountAvatar) return this.authError = '请先选择微信头像'
       this.profileSaving = true
       this.authError = ''
       try {
-        let user = await request('/v1/users/me', { method: 'PATCH', data: { nickname, phone, bio } })
+        let user = await request('/v1/users/me', { method: 'PATCH', data: { nickname, bio } })
         uni.setStorageSync('account_user', user)
         if (this.draftAvatar) {
           user = await uploadAvatar(this.draftAvatar)
@@ -62,6 +75,8 @@ export default {
 }
 </script>
 <style scoped>
+.phone-bind { display:flex; align-items:center; gap:12rpx; font-size:25rpx; color:#5f5768; }
+.phone-bind button { margin:0; padding:0 12rpx; background:#f2ecfb; color:#7955a6; font-size:24rpx; line-height:56rpx; }
 .cover-card { padding-top: 24rpx !important; padding-bottom: 24rpx !important; }.cover-preview { width: 100%; height: 260rpx; margin-top: 20rpx; border-radius: 20rpx; }.cover-card button { margin-top: 16rpx; background: #f2ecfb; color: #7955a6; font-size: 25rpx; }
 .profile-edit-page { min-height: 100vh; box-sizing: border-box; padding: 24rpx 28rpx calc(148rpx + env(safe-area-inset-bottom)); background: #f7f6fb; }
 .profile-setup-intro { margin: 4rpx 4rpx 24rpx; }
