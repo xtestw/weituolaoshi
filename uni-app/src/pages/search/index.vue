@@ -8,9 +8,7 @@
 </scroll-view>
 <view v-if="filterSheetOpen" class="filter-overlay" @tap="closeFilterSheet"><view class="filter-sheet" @tap.stop="stopTap"><view class="filter-sheet__handle"></view><view class="filter-sheet__head"><text>{{ filterSheetTitle }}</text><button @tap="closeFilterSheet" aria-label="关闭筛选">×</button></view><scroll-view scroll-y class="filter-sheet__list"><button v-for="(item, index) in filterSheetOptions" :key="item" :class="&quot;filter-option &quot; + (filterSheetSelected === item ? 'filter-option--selected' : '')" :data-value="item" @tap="selectFilterOption" :aria-selected="filterSheetSelected === item"><text>{{ item }}</text><view class="filter-option__mark" aria-hidden="true"></view></button></scroll-view></view></view>
 <view class="page results-page">
-  <view class="community-head">社区帖子 · {{ communityResults.length }}</view>
-  <button v-for="post in communityResults" :key="post.id" class="community-result" @tap="openCommunity(post)"><text>{{ post.title }}</text><text>{{ post.author || '用户' }} · {{ post.body }}</text><text>赞 {{ post.likeCount || 0 }} · 评 {{ post.commentCount || 0 }}</text></button>
-  <view class="community-head">Coser角色委托 · {{ results.length }}</view>
+  <view class="result-head">角色委托 · {{ results.length }}</view>
   <view v-if="catalogError" class="empty">网络暂不可用，正在展示示例内容</view>
   <view class="summary"><text class="summary__copy">{{ city }}找到 {{ results.length }} 位可预约 Coser · 已优先展示实名认证与高履约率</text><button @tap="clearFilters">重置</button></view>
   <view v-if="results.length" class="grid">
@@ -25,7 +23,6 @@ import ServiceCard from '../../components/service-card/index.vue'
 import { services, loadCatalog } from '../../utils/services'
 import { DISTRICTS, CITIES } from '../../utils/cities'
 import { get } from '../../utils/store'
-import { request } from '../../services/api'
 
 const filterOptions = {
   time: ['全部时间', '今天可约', '本周可约', '周末可约'],
@@ -37,7 +34,6 @@ export default {
 components: { ServiceCard },
 data() { return {
     keyword: '',
-    communityResults: [],
     city: '上海',
     filters: [
       { key: 'time', label: '时间', value: '' },
@@ -58,7 +54,6 @@ onLoad(options) {
     loadCatalog().then(() => this.applyFilters()).catch(() => this.setData({ catalogError: true }))
   },
 methods: {
-openCommunity(post) { uni.navigateTo({ url: `/pages/community-detail/index?id=${post.id}` }) },
 onKeyword(event) { this.setData({ keyword: event.detail.value }) },
 submit() { this.applyFilters() },
 chooseFilter(event) {
@@ -77,7 +72,6 @@ selectFilterOption(event) {
   },
 clearFilters() { this.setData({ filters: this.filters.map((item) => ({ ...item, value: '' })) }, this.applyFilters) },
 applyFilters() {
-    request(`/v1/posts?q=${encodeURIComponent(this.keyword.trim())}&city=${encodeURIComponent(this.city)}`).then(rows => this.setData({ communityResults: rows })).catch(() => this.setData({ communityResults: [] }))
     const selected = Object.fromEntries(this.filters.map((item) => [item.key, item.value]))
     const keyword = this.keyword.trim().toLowerCase()
     let results = services.filter((item) => (item.city || '上海') === this.city && (!keyword || `${item.title}${item.coser}${item.district}`.toLowerCase().includes(keyword)))
@@ -96,7 +90,7 @@ setData(patch, callback) { Object.assign(this.$data, patch); if (callback) this.
 }
 </script>
 <style>
-.community-head { padding: 22rpx 0; font-weight: 700; font-size: 30rpx; }.community-result { display: block; width: 100%; padding: 22rpx; margin-bottom: 14rpx; border-radius: 18rpx; background: white; text-align: left; }.community-result text { display: block; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }.community-result text:nth-child(2) { color: #777; font-size: 23rpx; }.community-result text:last-child { color: #6d28d9; font-size: 22rpx; }
+.result-head { padding: 22rpx 0; font-weight: 700; font-size: 30rpx; }
 .searchbar { height: 104rpx; box-sizing: border-box; padding: 10rpx 28rpx; display: flex; align-items: center; gap: 12rpx; background: #fff; }
 .searchbar input { flex: 1; min-width: 0; height: 84rpx; box-sizing: border-box; padding: 0 24rpx; border-radius: 999rpx; background: var(--color-soft); font-size: 27rpx; }
 .searchbar button { min-width: 104rpx; min-height: 84rpx; margin: 0; padding: 0; display: flex; align-items: center; justify-content: center; border: 0; background: transparent; color: var(--color-primary); font-size: 27rpx; font-weight: 700; line-height: 1; }

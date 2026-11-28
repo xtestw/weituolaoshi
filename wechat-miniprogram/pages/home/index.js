@@ -1,7 +1,6 @@
 const { services, loadCatalog } = require('../../utils/services')
 const { CITIES } = require('../../utils/cities')
 const { get, set } = require('../../utils/store')
-const { request } = require('../../services/api')
 
 function buildCalendarDays() {
   const now = new Date()
@@ -25,7 +24,6 @@ Page({
     cities: CITIES,
     cityPickerOpen: false,
     keyword: '',
-    communityPosts: [],
     activeFeed: 'recommend',
     dateLabel: '日历可约',
     calendarOpen: false,
@@ -49,11 +47,8 @@ Page({
     const city = get('currentCity', '上海')
     if (city !== this.data.city) this.setData({ city }, () => this.applyFeed(this.data.activeFeed))
     loadCatalog().then(() => this.applyFeed(this.data.activeFeed)).catch(() => this.setData({ catalogError: true }))
-    request('/v1/posts').then(communityPosts => this.setData({ communityPosts })).catch(() => this.setData({ communityPosts: [] }))
     this.showWomenOnlyNotice()
   },
-  openCommunity(e) { wx.navigateTo({ url: `/pages/community-detail/index?id=${e.currentTarget.dataset.id}` }) },
-  openMyPosts() { if (!wx.getStorageSync('account_token')) return wx.switchTab({ url: '/pages/profile/index' }); wx.navigateTo({ url: '/pages/community-mine/index' }) },
   showWomenOnlyNotice() {
     let did = wx.getStorageSync('coser_v1_local_did')
     if (!did) {
@@ -63,7 +58,7 @@ Page({
     const key = `coser_v1_women_notice_${did}`
     if (wx.getStorageSync(key)) return
     wx.setStorageSync(key, true)
-    wx.showModal({ title: '欢迎来到全女平台', content: '这里是全女委托社区。你可以自由浏览；下单和发布前，我们会核验女性身份及成年状态。', showCancel: false, confirmText: '我知道了' })
+    wx.showModal({ title: '欢迎来到全女平台', content: '这里是全女角色委托平台。你可以自由浏览；下单和发布前，我们会核验女性身份及成年状态。', showCancel: false, confirmText: '我知道了' })
   },
   selectCity() {
     this.setData({ cityPickerOpen: true })

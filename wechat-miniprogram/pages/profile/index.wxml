@@ -3,7 +3,6 @@
   <block wx:if="{{role === 'customer'}}">
     <view class="section commission"><view class="section__head"><text class="section__title">我的委托</text><button bindtap="openOrders">全部委托 ›</button></view><view class="status-grid"><button bindtap="openOrders"><view class="status-icon status-icon--clock"></view><text>待确认</text><text class="count">1</text></button><button bindtap="openOrders"><view class="status-icon status-icon--card"></view><text>待支付</text></button><button bindtap="openOrders"><view class="status-icon status-icon--calendar"></view><text>待履约</text></button><button bindtap="openOrders"><view class="status-icon status-icon--heart"></view><text>待评价</text></button></view></view>
     <button class="entry" bindtap="openFavorites"><view class="entry__mark">收</view><view><text>我的收藏</text><text>{{favorites}}个心仪委托</text></view><text>›</text></button>
-    <button class="entry" bindtap="openCommunityPosts"><view class="entry__mark">帖</view><view><text>我的社区帖子</text><text>发布与管理普通用户内容</text></view><text>›</text></button>
     <view class="section menu"><button bindtap="openCoser"><text>我是 Coser</text><text>进入 Coser 端 ›</text></button><button bindtap="openVerification"><text>实名认证</text><text>{{verified ? '已完成' : '去认证'}} ›</text></button><button bindtap="openSafety"><text>安全中心</text><text>{{emergencyContactSet ? '已设置紧急联系人' : '设置紧急联系人'}} ›</text></button><button bindtap="openHelp"><text>帮助与客服</text><text>›</text></button></view>
   </block>
   <block wx:else>

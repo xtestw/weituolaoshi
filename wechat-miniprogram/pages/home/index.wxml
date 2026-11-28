@@ -44,7 +44,7 @@
 </view>
 
 <view class="page home-page">
-  <view class="community-section"><view class="community-head"><text>社区帖子 · 普通用户</text><button bindtap="openMyPosts">我的帖子 ›</button></view><button wx:for="{{communityPosts}}" wx:key="id" class="community-card" data-id="{{item.id}}" bindtap="openCommunity"><text>{{item.title}}</text><text>{{item.author || '用户'}} · {{item.body}}</text></button></view><view class="community-head"><text>Coser角色委托</text></view>
+  <view class="community-head"><text>同城角色委托</text></view>
   <view wx:if="{{catalogError}}" class="empty">网络暂不可用，正在展示示例内容</view>
   <scroll-view class="feed-tabs" scroll-x enhanced show-scrollbar="false">
     <button wx:for="{{feeds}}" wx:key="key" class="feed-tab {{activeFeed === item.key ? 'feed-tab--active' : ''}} {{item.key === 'calendar' && calendarOpen ? 'feed-tab--open' : ''}}" data-key="{{item.key}}" bindtap="selectFeed" aria-selected="{{activeFeed === item.key}}">{{item.label}}</button>

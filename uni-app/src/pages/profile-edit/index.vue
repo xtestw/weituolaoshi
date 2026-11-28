@@ -1,7 +1,6 @@
 <template>
 <view class="profile-edit-page">
   <view v-if="firstLogin" class="profile-setup-intro"><text class="profile-setup-title">设置微信头像和昵称</text><text class="profile-setup-hint">首次登录请先选择头像和昵称，完成后即可使用账号。</text></view>
-  <view class="profile-card cover-card"><text class="profile-row-title">主页封面</text><text class="profile-row-hint">封面、头像、昵称和简介会在个人主页公开；手机号不公开。</text><image v-if="draftCover || accountCover" class="cover-preview" :src="draftCover || accountCover" mode="aspectFill"/><button @tap="chooseCover">{{ draftCover || accountCover ? '更换封面' : '添加封面' }}（2MB以内）</button></view>
   <view class="profile-card profile-avatar-row">
     <view><text class="profile-row-title">头像</text><text class="profile-row-hint">{{ firstLogin ? '点击右侧选择微信头像' : '点击右侧头像更换' }}</text></view>
     <button class="profile-avatar-picker" open-type="chooseAvatar" @chooseavatar="onChooseAvatar" aria-label="选择头像"><image v-if="draftAvatar || accountAvatar" :src="draftAvatar || accountAvatar" mode="aspectFill"/><text v-else>{{ accountInitial }}</text></button>
@@ -16,9 +15,9 @@
 </view>
 </template>
 <script>
-import { request, uploadAvatar, uploadCover, mediaUrl } from '../../services/api'
+import { request, uploadAvatar } from '../../services/api'
 export default {
-  data() { return { draftCover: '', accountCover: '', draftNickname: '', draftPhone: '', draftBio: '', draftAvatar: '', accountAvatar: '', accountInitial: '我', profileSaving: false, authError: '', firstLogin: false } },
+  data() { return { draftNickname: '', draftPhone: '', draftBio: '', draftAvatar: '', accountAvatar: '', accountInitial: '我', profileSaving: false, authError: '', firstLogin: false } },
   onLoad(options) {
     if (!uni.getStorageSync('account_token')) return uni.navigateBack()
     const user = uni.getStorageSync('account_user') || {}
@@ -28,12 +27,10 @@ export default {
     this.draftNickname = name === '微信用户' ? '' : name
     this.draftPhone = user.phone || ''
     this.draftBio = user.bio || ''
-    this.accountCover = mediaUrl(user.coverUrl || '')
     this.accountInitial = name.slice(0, 1)
     this.accountAvatar = avatar.startsWith('/') ? `${getApp().globalData.apiBaseUrl}${avatar}` : avatar
   },
   methods: {
-    chooseCover() { uni.chooseMedia({ count: 1, mediaType: ['image'], sourceType: ['album'], success: ({ tempFiles }) => { const file = tempFiles[0]; if (file.size > 2 * 1024 * 1024) return uni.showToast({ title: '封面不得超过2MB', icon: 'none' }); this.draftCover = file.tempFilePath } }) },
     onNickname(event) { this.draftNickname = event.detail.value },
     onPhone(event) { this.draftPhone = event.detail.value },
     onBio(event) { this.draftBio = event.detail.value },
@@ -56,7 +53,6 @@ export default {
           user = await uploadAvatar(this.draftAvatar)
           uni.setStorageSync('account_user', user)
         }
-        if (this.draftCover) { user = await uploadCover(this.draftCover); uni.setStorageSync('account_user', user) }
         uni.showToast({ title: '资料已保存', icon: 'success' })
         setTimeout(() => uni.navigateBack(), 400)
       } catch (error) { this.authError = error.message || '保存失败，请重试' }

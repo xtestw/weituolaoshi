@@ -19,10 +19,9 @@
 </view>
 
 <view class="page home-page">
-  <button class="trust-line" @tap="showRules">全女委托社区 · 预约前需成年实名认证 <text>›</text></button>
-  <view class="home-tabs"><button :class="{ active: activeTab === 'services' }" @tap="activeTab = 'services'">找委托</button><button :class="{ active: activeTab === 'community' }" @tap="activeTab = 'community'">逛社区</button><text>发现同城的心动角色</text></view>
-  <view v-if="activeTab === 'services'">
-    <view class="home-filters">
+  <button class="trust-line" @tap="showRules">全女角色委托 · 预约前需成年实名认证 <text>›</text></button>
+  <view class="market-heading"><text>同城角色委托</text><text>发现心动角色，安心预约</text></view>
+  <view class="home-filters">
       <picker mode="date" :start="today" :value="selectedDate || today" @change="chooseDate"><view :class="['filter-chip', { selected: selectedDate }]">{{ selectedDate ? selectedDate.slice(5) : '日期' }} ⌄</view></picker>
       <picker :range="roleOptions" @change="chooseRole"><view :class="['filter-chip', { selected: selectedRole }]">{{ selectedRole || '角色 / 作品' }} ⌄</view></picker>
       <picker :range="priceOptions" :value="priceIndex" @change="choosePrice"><view :class="['filter-chip', { selected: priceIndex }]">{{ priceIndex ? priceOptions[priceIndex] : '价格' }} ⌄</view></picker>
@@ -33,25 +32,8 @@
     <view v-else-if="loading || filtering" class="home-empty">{{ filtering ? '正在核对所选日期的真实档期…' : '正在寻找心动角色…' }}</view>
     <view v-else-if="filterError" class="home-empty"><text>部分档期暂时无法查询</text><button @tap="applyFeed">重新查询</button></view>
     <view v-else-if="left.length || right.length" class="waterfall"><view class="column"><service-card v-for="item in left" :key="item.id" :item="item" @open="openService"/></view><view class="column"><service-card v-for="item in right" :key="item.id" :item="item" @open="openService"/></view></view>
-    <view v-else class="home-empty"><text>{{ hasFilters ? '暂无符合条件的委托，试试其他条件' : city + '暂无委托，可以切换城市看看' }}</text><button v-if="hasFilters" @tap="clearFilters">清空筛选</button><button v-else @tap="activeTab = 'community'">去逛社区</button></view>
+    <view v-else class="home-empty"><text>{{ hasFilters ? '暂无符合条件的委托，试试其他条件' : city + '暂无委托，可以切换城市看看' }}</text><button v-if="hasFilters" @tap="clearFilters">清空筛选</button><button v-else @tap="selectCity">切换城市</button></view>
     <text v-if="selectedDate && !filtering && !filterError" class="date-note">所选日期有可用时段，具体开始时间请在预约时确认。</text>
-  </view>
-  <view v-else class="community-section">
-    <view class="community-head"><text>同城的新鲜事</text><button @tap="openMyPosts">我的帖子 ›</button></view>
-    <view class="community-intro"><text>返图、心情，还有想分享的故事</text><button @tap="createPost">分享一篇</button></view>
-    <view v-if="communityLoading" class="home-empty">正在加载社区内容…</view>
-    <view v-else-if="communityError" class="home-empty"><text>社区暂时加载失败</text><button @tap="loadCommunityPosts">重新加载</button></view>
-    <template v-else>
-      <button v-for="post in communityPosts" :key="post.id" class="story-card" @tap="openCommunity(post)">
-        <text class="story-author" @tap.stop="openAuthor(post.authorId)">{{ post.author || '社区用户' }} · {{ city }}</text>
-        <text class="story-title">{{ post.title }}</text>
-        <image v-if="post.coverUrl" class="story-cover" :src="post.coverUrl" mode="aspectFill"/>
-        <text class="story-body">{{ post.body }}</text>
-        <text class="story-meta">{{ post.likeCount || 0 }} 赞 · {{ post.commentCount || 0 }} 评论</text>
-      </button>
-      <view v-if="!communityPosts.length" class="home-empty"><text>来分享第一篇同城故事</text><button @tap="createPost">发布社区帖</button></view>
-    </template>
-  </view>
 </view>
 
 </template>
@@ -60,20 +42,18 @@ import ServiceCard from '../../components/service-card/index.vue'
 import { loadCatalog } from '../../utils/services'
 import { CITIES } from '../../utils/cities'
 import { get, set } from '../../utils/store'
-import { request, mediaUrl } from '../../services/api'
 
 export default {
 components: { ServiceCard },
 data() { return {
-    activeTab: 'services', selectedDate: '', selectedRole: '', priceIndex: 0, availableOnly: false,
+    selectedDate: '', selectedRole: '', priceIndex: 0, availableOnly: false,
     priceOptions: ['不限价格', '¥150以下', '¥150–200', '¥200以上'], catalog: [],
     today: '', loading: true, filtering: false, filterError: false, catalogError: false,
-    filterVersion: 0, catalogVersion: 0, communityVersion: 0, communityLoading: false, communityError: false,
+    filterVersion: 0, catalogVersion: 0,
     city: '上海',
     cities: CITIES,
     cityPickerOpen: false,
     keyword: '',
-    communityPosts: [],
     left: [],
     right: []
   } },
@@ -92,8 +72,7 @@ onShow() {
 onShareAppMessage() { return { title: '次元委托｜寻找同城可约 Coser', path: '/pages/home/index' } },
 onPullDownRefresh() { this.refresh().finally(() => uni.stopPullDownRefresh()) },
 methods: {
-openAuthor(id) { if (id) uni.navigateTo({ url: `/pages/user-home/index?id=${encodeURIComponent(id)}` }) },
-async refresh() { await Promise.all([this.loadServices(), this.loadCommunityPosts()]) },
+async refresh() { await this.loadServices() },
 async loadServices() {
   const version = ++this.catalogVersion
   this.loading = true; this.catalogError = false
@@ -101,30 +80,12 @@ async loadServices() {
   catch { if (version === this.catalogVersion) { this.catalogError = true; this.left = []; this.right = [] } }
   finally { if (version === this.catalogVersion) this.loading = false }
 },
-async loadCommunityPosts() {
-  const version = ++this.communityVersion
-  this.communityLoading = true; this.communityError = false
-  try {
-    const rows = await request(`/v1/posts?city=${encodeURIComponent(this.city)}`)
-    if (version === this.communityVersion) {
-      this.communityPosts = rows.map(post => {
-        const first = (post.images && post.images[0]) || null
-        return { ...post, coverUrl: first ? mediaUrl(first.url) : '' }
-      })
-    }
-  }
-  catch { if (version === this.communityVersion) { this.communityPosts = []; this.communityError = true } }
-  finally { if (version === this.communityVersion) this.communityLoading = false }
-},
-showRules() { uni.showModal({ title: '全女委托社区', content: '你可以自由浏览；下单和发布委托前需要完成成年女性身份核验。委托仅限允许的公共场所，不支持过夜。', showCancel: false, confirmText: '我知道了' }) },
-createPost() { if (!uni.getStorageSync('account_token')) return uni.switchTab({ url: '/pages/profile/index' }); uni.navigateTo({ url: '/pages/community-editor/index' }) },
+showRules() { uni.showModal({ title: '全女角色委托', content: '你可以自由浏览；下单和发布委托前需要完成成年女性身份核验。委托仅限允许的公共场所，不支持过夜。', showCancel: false, confirmText: '我知道了' }) },
 chooseDate(event) { this.selectedDate = event.detail.value; this.applyFeed() },
 chooseRole(event) { this.selectedRole = Number(event.detail.value) ? this.roleOptions[Number(event.detail.value)] : ''; this.applyFeed() },
 choosePrice(event) { this.priceIndex = Number(event.detail.value); this.applyFeed() },
 toggleAvailable() { this.availableOnly = !this.availableOnly; this.applyFeed() },
 clearFilters() { this.selectedDate = ''; this.selectedRole = ''; this.priceIndex = 0; this.availableOnly = false; this.applyFeed() },
-openCommunity(post) { uni.navigateTo({ url: `/pages/community-detail/index?id=${post.id}` }) },
-openMyPosts() { if (!uni.getStorageSync('account_token')) return uni.switchTab({ url: '/pages/profile/index' }); uni.navigateTo({ url: '/pages/community-mine/index' }) },
 selectCity() {
     this.setData({ cityPickerOpen: true })
     uni.hideTabBar()
@@ -141,7 +102,6 @@ chooseCity(event) {
     this.selectedRole = ''
     this.setData({ city, cityPickerOpen: false }, () => {
       this.applyFeed()
-      this.loadCommunityPosts()
     })
     uni.showTabBar()
   },
@@ -185,7 +145,6 @@ setData(patch, callback) { Object.assign(this.$data, patch); if (callback) this.
 }
 </script>
 <style scoped>
-.community-section { margin-bottom: 28rpx; }.community-head { display: flex; justify-content: space-between; align-items: center; padding: 20rpx 0; font-size: 30rpx; font-weight: 700; }.community-head button { margin: 0; background: transparent; color: #6d28d9; font-size: 24rpx; }.community-card { display: block; width: 100%; text-align: left; background: white; border-radius: 20rpx; padding: 22rpx; margin-bottom: 14rpx; }.community-card text { display: block; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }.community-card text:first-child { font-weight: 700; }.community-card text:nth-child(2) { color: #777; font-size: 24rpx; }.community-meta { margin-top: 8rpx; color: #6d28d9 !important; font-size: 22rpx !important; }
 .home-head { position: sticky; z-index: 30; top: 0; padding-left: 28rpx; padding-right: 28rpx; padding-bottom: 18rpx; border-bottom: 1rpx solid rgba(231,226,236,.85); background: rgba(255,255,255,.97); box-shadow: 0 8rpx 24rpx rgba(67,55,91,.04); }
 .brand-row { height: 84rpx; display: flex; align-items: center; }
 .brand-name { font-size: var(--type-page); line-height: 1.25; font-weight: var(--weight-page); letter-spacing: 1rpx; }
@@ -227,16 +186,10 @@ setData(patch, callback) { Object.assign(this.$data, patch); if (callback) this.
 .feed-summary button { margin: 0; padding: 0 8rpx; background: transparent; color: #7c4ec1; font-size: 23rpx; }
 .waterfall { margin-top: 0; }
 .home-empty { display: flex; flex-direction: column; align-items: center; gap: 20rpx; padding: 70rpx 24rpx; border-radius: 24rpx; background: #fff; text-align: center; font-size: 26rpx; color: #80738e; }
-.home-empty button,.community-intro button { margin: 0; padding: 0 26rpx; border-radius: 32rpx; background: #eee7fc; color: #6d28d9; font-size: 24rpx; }
-.community-intro { display: flex; align-items: center; justify-content: space-between; margin-bottom: 24rpx; color: #93879d; font-size: 23rpx; }
-.story-card { width: 100%; margin: 0 0 20rpx; padding: 28rpx; border-radius: 24rpx; background: #fff; text-align: left; line-height: 1.5; }
-.story-card text { display: block; }
-.story-author,.story-meta { color: #93879d; font-size: 23rpx; }
-.story-title { margin-top: 16rpx; font-size: 30rpx; font-weight: 700; color: #35213f; }
-.story-cover { width: 100%; height: 280rpx; margin-top: 16rpx; border-radius: 18rpx; background: #f1eff5; }
-.story-body { margin: 12rpx 0 24rpx; font-size: 26rpx; color: #71647e; }
-.story-title,.story-body { display: -webkit-box !important; overflow: hidden; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
-.story-body { -webkit-line-clamp: 3; }
+.home-empty button { margin: 0; padding: 0 26rpx; border-radius: 32rpx; background: #eee7fc; color: #6d28d9; font-size: 24rpx; }
 .date-note { display: block; margin-top: 20rpx; color: #93879d; font-size: 23rpx; }
 button::after { border: none; }
+.market-heading { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 20rpx; }
+.market-heading text:first-child { color: #35213f; font-size: 32rpx; font-weight: 800; }
+.market-heading text:last-child { color: #a091ab; font-size: 22rpx; }
 </style>

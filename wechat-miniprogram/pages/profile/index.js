@@ -40,7 +40,6 @@ Page({
     const role = !!user && get('role', 'customer') === 'coser' ? 'coser' : 'customer'
     this.setData({ loggedIn: !!user, coserVerified, role, accountName: user ? name : '登录', accountInitial: user ? name.slice(0, 1) : '我', accountAvatar: avatar && avatar.startsWith('/') ? `${getApp().globalData.apiBaseUrl}${avatar}` : avatar, authError: '' })
   },
-  openCommunityPosts() { if (!this.data.loggedIn) return this.loginAccount(); wx.navigateTo({ url: '/pages/community-mine/index' }) },
   editProfile() { if (this.data.loggedIn) wx.navigateTo({ url: '/pages/profile-edit/index' }) },
   syncIdentity() {
     return request('/v1/identity/me').then(identity => {
